@@ -26,6 +26,7 @@ const empty = {
   start_date: '',
   end_date: '',
   is_current: false,
+  is_visible: true,
   description: '',
   achievements: '',
 }
@@ -84,13 +85,14 @@ export function AdminExperiencePage() {
                   start_date: form.start_date || null,
                   end_date: form.is_current ? null : form.end_date || null,
                   is_current: form.is_current,
+                  is_visible: form.is_visible,
                   description: form.description || null,
                   achievements: form.achievements || null,
                   display_order: editingId
                     ? items.find((item) => item.id === editingId)?.display_order ??
                       items.length
                     : items.length,
-                })
+                } as Parameters<typeof saveExperience>[0])
                 toast.success(editingId ? 'Experience updated' : 'Experience added')
                 reset()
                 reload()
@@ -153,6 +155,15 @@ export function AdminExperiencePage() {
             />
             Current Position
           </label>
+          <label className="flex items-center gap-3 text-sm">
+            <Switch
+              checked={form.is_visible}
+              onCheckedChange={(checked) =>
+                setForm({ ...form, is_visible: checked })
+              }
+            />
+            Visible on public site
+          </label>
           <div className="space-y-2">
             <Label>Description</Label>
             <Textarea
@@ -187,6 +198,9 @@ export function AdminExperiencePage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold">{item.title}</h3>
                     {item.is_current ? <Badge>Current</Badge> : null}
+                    {'is_visible' in item && item.is_visible === false ? (
+                      <Badge variant="secondary">Hidden</Badge>
+                    ) : null}
                   </div>
                   <p className="text-sm text-muted-foreground">{item.organization}</p>
                   <p className="text-xs text-muted-foreground">
@@ -209,6 +223,10 @@ export function AdminExperiencePage() {
                         start_date: item.start_date ?? '',
                         end_date: item.end_date ?? '',
                         is_current: item.is_current,
+                        is_visible:
+                          'is_visible' in item && typeof item.is_visible === 'boolean'
+                            ? item.is_visible
+                            : true,
                         description: item.description ?? '',
                         achievements: item.achievements ?? '',
                       })

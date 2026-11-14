@@ -110,3 +110,14 @@ export async function deleteHobby(id: string) {
   const { error } = await supabase.from('hobbies').delete().eq('id', id)
   await assertNoError(error)
 }
+
+export async function reorderHobbies(orderedIds: string[]) {
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase.from('hobbies').update({ display_order: index }).eq('id', id),
+    ),
+  )
+  for (const { error } of results) {
+    await assertNoError(error)
+  }
+}

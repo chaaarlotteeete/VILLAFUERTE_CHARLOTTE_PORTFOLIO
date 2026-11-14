@@ -1,39 +1,55 @@
-import { ArrowDown, ArrowUp } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { GripVertical } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { arrayMove } from '@dnd-kit/sortable'
 
 import { FileUploadField } from '@/components/admin/FileUploadField'
+import { ReorderControls } from '@/components/admin/ReorderControls'
+import { SearchableCombobox } from '@/components/admin/SearchableCombobox'
+import {
+  SortableItemShell,
+  SortableList,
+} from '@/components/admin/SortableList'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { HOBBY_CATEGORIES } from '@/lib/constants'
+import {
+  createHobbyCategory,
+  createHobbyOption,
+  fetchHobbyCategories,
+  fetchHobbyOptions,
+} from '@/services/catalogs'
 import {
   fetchAdminHobbyById,
   saveAdminHobby,
 } from '@/services/adminHobbies'
+import type { HobbyCategory } from '@/types/database'
+
+const OTHER_ID = '__other__'
+const IMAGE_ACCEPT = '.jpg,.jpeg,.png,.webp'
 
 interface MediaDraft {
   key: string
   image_url: string
   caption: string
+  alt_text: string
 }
 
 interface FormState {
-  name: string
+  categoryId: string | null
+  customCategory: string
   category: string
+  optionId: string | null
+  customName: string
+  name: string
+  hobby_category_id: string | null
+  hobby_option_id: string | null
   short_description: string
   detailed_description: string
   icon: string
@@ -45,8 +61,14 @@ interface FormState {
 
 function emptyForm(): FormState {
   return {
+    categoryId: null,
+    customCategory: '',
+    category: '',
+    optionId: null,
+    customName: '',
     name: '',
-    category: HOBBY_CATEGORIES[0],
+    hobby_category_id: null,
+    hobby_option_id: null,
     short_description: '',
     detailed_description: '',
     icon: '',
@@ -57,43 +79,136 @@ function emptyForm(): FormState {
   }
 }
 
-function moveItem<T>(list: T[], index: number, direction: -1 | 1) {
-  const target = index + direction
-  if (target < 0 || target >= list.length) return list
-  const next = [...list]
-  ;[next[index], next[target]] = [next[target], next[index]]
-  return next
-}
-
 export function AdminHobbyFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const isEdit = Boolean(id)
 
-  const [loading, setLoading] = useState(isEdit)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
+  const [categories, setCategories] = useState<HobbyCategory[]>([])
+  const [hobbyOptions, setHobbyOptions] = useState<
+    Array<{ id: string; name: string }>
+  >([])
+
+  const categoryComboboxOptions = useMemo(
+    () => categories.map((cat) => ({ id: cat.id, label: cat.name })),
+    [categories],
+  )
+
+  const optionComboboxOptions = useMemo(
+    () => hobbyOptions.map((opt) => ({ id: opt.id, label: opt.name })),
+    [hobbyOptions],
+  )
 
   useEffect(() => {
     let active = true
 
-    async function load() {
+    async function loadCategories() {
+      try {
+        const rows = await fetchHobbyCategories()
+        if (active) setCategories(rows)
+      } catch (err) {
+        if (active) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to load categories',
+          )
+        }
+      }
+    }
+
+    void loadCategories()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadOptions() {
+      if (!form.categoryId || form.categoryId === OTHER_ID) {
+        setHobbyOptions([])
+        return
+      }
+      try {
+        const rows = await fetchHobbyOptions(form.categoryId)
+        if (active) setHobbyOptions(rows)
+      } catch (err) {
+        if (active) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to load hobby names',
+          )
+        }
+      }
+    }
+
+    void loadOptions()
+    return () => {
+      active = false
+    }
+  }, [form.categoryId])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadHobby() {
       if (!id) {
         setLoading(false)
         return
       }
       try {
-        const hobby = await fetchAdminHobbyById(id)
+        const [hobby, cats] = await Promise.all([
+          fetchAdminHobbyById(id),
+          fetchHobbyCategories(),
+        ])
         if (!active) return
+        setCategories(cats)
+
         if (!hobby) {
           setError('Hobby not found')
           setLoading(false)
           return
         }
+
+        let categoryId: string | null = hobby.hobby_category_id
+        let customCategory = ''
+        if (!categoryId && hobby.category) {
+          const match = cats.find(
+            (cat) => cat.name.toLowerCase() === hobby.category.toLowerCase(),
+          )
+          categoryId = match?.id ?? OTHER_ID
+          if (categoryId === OTHER_ID) customCategory = hobby.category
+        }
+
+        let options: Array<{ id: string; name: string }> = []
+        if (categoryId && categoryId !== OTHER_ID) {
+          options = await fetchHobbyOptions(categoryId)
+          if (!active) return
+          setHobbyOptions(options)
+        }
+
+        let optionId: string | null = hobby.hobby_option_id
+        let customName = ''
+        if (!optionId && hobby.name) {
+          const match = options.find(
+            (opt) => opt.name.toLowerCase() === hobby.name.toLowerCase(),
+          )
+          optionId = match?.id ?? OTHER_ID
+          if (optionId === OTHER_ID) customName = hobby.name
+        }
+
         setForm({
-          name: hobby.name,
+          categoryId,
+          customCategory,
           category: hobby.category,
+          optionId,
+          customName,
+          name: hobby.name,
+          hobby_category_id: hobby.hobby_category_id,
+          hobby_option_id: hobby.hobby_option_id,
           short_description: hobby.short_description ?? '',
           detailed_description: hobby.detailed_description ?? '',
           icon: hobby.icon ?? '',
@@ -104,6 +219,7 @@ export function AdminHobbyFormPage() {
             key: item.id,
             image_url: item.image_url,
             caption: item.caption ?? '',
+            alt_text: item.alt_text ?? '',
           })),
         })
       } catch (err) {
@@ -115,7 +231,7 @@ export function AdminHobbyFormPage() {
       }
     }
 
-    void load()
+    void loadHobby()
     return () => {
       active = false
     }
@@ -125,27 +241,111 @@ export function AdminHobbyFormPage() {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
+  function updateMedia(next: MediaDraft[]) {
+    updateField('media', next)
+  }
+
+  const showCustomCategory = form.categoryId === OTHER_ID
+  const showCustomName = form.optionId === OTHER_ID
+  const categorySelected =
+    Boolean(form.categoryId) &&
+    (form.categoryId !== OTHER_ID || form.customCategory.trim())
+
   function validate() {
-    if (!form.name.trim()) {
-      toast.error('Hobby name is required')
-      return false
-    }
-    if (!form.category.trim()) {
+    if (!form.categoryId) {
       toast.error('Category is required')
       return false
     }
+    if (form.categoryId === OTHER_ID && !form.customCategory.trim()) {
+      toast.error('Custom category is required')
+      return false
+    }
+    if (!form.optionId) {
+      toast.error('Hobby name is required')
+      return false
+    }
+    if (form.optionId === OTHER_ID && !form.customName.trim()) {
+      toast.error('Custom hobby name is required')
+      return false
+    }
+    if (form.optionId !== OTHER_ID && !form.name.trim()) {
+      toast.error('Hobby name is required')
+      return false
+    }
     return true
+  }
+
+  async function resolveCategoryAndName() {
+    let categoryId = form.categoryId
+    let categoryText = form.category
+
+    if (categoryId === OTHER_ID) {
+      const custom = form.customCategory.trim()
+      const existing = categories.find(
+        (cat) => cat.name.toLowerCase() === custom.toLowerCase(),
+      )
+      if (existing) {
+        categoryId = existing.id
+        categoryText = existing.name
+      } else {
+        const created = await createHobbyCategory(custom)
+        categoryId = created.id
+        categoryText = created.name
+        setCategories((current) => [...current, created])
+      }
+    } else if (categoryId) {
+      categoryText =
+        categories.find((cat) => cat.id === categoryId)?.name ?? categoryText
+    }
+
+    let optionId = form.optionId
+    let nameText = form.name
+
+    if (optionId === OTHER_ID) {
+      const custom = form.customName.trim()
+      const options =
+        categoryId && categoryId !== OTHER_ID
+          ? await fetchHobbyOptions(categoryId)
+          : []
+      const existing = options.find(
+        (opt) => opt.name.toLowerCase() === custom.toLowerCase(),
+      )
+      if (existing) {
+        optionId = existing.id
+        nameText = existing.name
+      } else if (categoryId && categoryId !== OTHER_ID) {
+        const created = await createHobbyOption(categoryId, custom)
+        optionId = created.id
+        nameText = created.name
+      } else {
+        nameText = custom
+        optionId = null
+      }
+    } else if (optionId && optionId !== OTHER_ID) {
+      nameText =
+        hobbyOptions.find((opt) => opt.id === optionId)?.name ?? nameText
+    }
+
+    return {
+      categoryId: categoryId === OTHER_ID ? null : categoryId,
+      categoryText,
+      optionId: optionId === OTHER_ID ? null : optionId,
+      nameText,
+    }
   }
 
   async function handleSave() {
     if (!validate()) return
     setSaving(true)
     try {
+      const resolved = await resolveCategoryAndName()
       const saved = await saveAdminHobby({
         hobby: {
           ...(id ? { id } : {}),
-          name: form.name.trim(),
-          category: form.category,
+          name: resolved.nameText.trim(),
+          category: resolved.categoryText,
+          hobby_category_id: resolved.categoryId,
+          hobby_option_id: resolved.optionId,
           short_description: form.short_description.trim() || null,
           detailed_description: form.detailed_description.trim() || null,
           icon: form.icon.trim() || null,
@@ -158,6 +358,7 @@ export function AdminHobbyFormPage() {
           .map((item, index) => ({
             image_url: item.image_url.trim(),
             caption: item.caption.trim() || null,
+            alt_text: item.alt_text.trim() || null,
             display_order: index,
           })),
       })
@@ -172,12 +373,23 @@ export function AdminHobbyFormPage() {
 
   function handlePreview() {
     if (!validate()) return
+    const categoryLabel =
+      form.categoryId === OTHER_ID
+        ? form.customCategory || 'Other'
+        : form.category
+    const nameLabel =
+      form.optionId === OTHER_ID ? form.customName || 'Other' : form.name
     toast.message('Preview', {
-      description: `${form.name} · ${form.category} · ${
+      description: `${nameLabel} · ${categoryLabel} · ${
         form.is_visible ? 'Visible' : 'Hidden'
       }`,
     })
   }
+
+  const sortableMedia = useMemo(
+    () => form.media.map((item) => ({ ...item, id: item.key })),
+    [form.media],
+  )
 
   if (loading) return <LoadingState rows={4} />
   if (error) return <ErrorState message={error} />
@@ -205,33 +417,77 @@ export function AdminHobbyFormPage() {
       <section className="space-y-4 rounded-xl border bg-card p-5">
         <h2 className="text-lg font-semibold">Basic Information</h2>
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="hobby-name">Hobby Name</Label>
-            <Input
-              id="hobby-name"
-              value={form.name}
-              onChange={(event) => updateField('name', event.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Category</Label>
-            <Select
-              value={form.category}
-              onValueChange={(value) => updateField('category', value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {HOBBY_CATEGORIES.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <SearchableCombobox
+            label="Category"
+            required
+            value={form.categoryId}
+            options={categoryComboboxOptions}
+            placeholder="Select category"
+            searchPlaceholder="Search categories..."
+            onChange={(value, option) => {
+              updateField('categoryId', value)
+              updateField('optionId', null)
+              updateField('customName', '')
+              updateField('name', '')
+              if (value === OTHER_ID) {
+                updateField('customCategory', '')
+                return
+              }
+              if (option) {
+                updateField('category', option.label)
+                updateField('customCategory', '')
+              }
+            }}
+          />
+          {showCustomCategory ? (
+            <div className="space-y-2">
+              <Label htmlFor="custom-category">Custom category</Label>
+              <Input
+                id="custom-category"
+                value={form.customCategory}
+                onChange={(event) => {
+                  updateField('customCategory', event.target.value)
+                  updateField('category', event.target.value)
+                }}
+                required
+              />
+            </div>
+          ) : null}
+          <SearchableCombobox
+            label="Hobby Name"
+            required
+            value={form.optionId}
+            options={optionComboboxOptions}
+            placeholder="Select hobby"
+            searchPlaceholder="Search hobbies..."
+            disabled={!categorySelected}
+            onChange={(value, option) => {
+              updateField('optionId', value)
+              if (value === OTHER_ID) {
+                updateField('customName', '')
+                updateField('name', '')
+                return
+              }
+              if (option) {
+                updateField('name', option.label)
+                updateField('customName', '')
+              }
+            }}
+          />
+          {showCustomName ? (
+            <div className="space-y-2">
+              <Label htmlFor="custom-hobby-name">Custom hobby name</Label>
+              <Input
+                id="custom-hobby-name"
+                value={form.customName}
+                onChange={(event) => {
+                  updateField('customName', event.target.value)
+                  updateField('name', event.target.value)
+                }}
+                required
+              />
+            </div>
+          ) : null}
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="short_description">Short Description</Label>
             <Textarea
@@ -270,87 +526,133 @@ export function AdminHobbyFormPage() {
         <FileUploadField
           label="Cover Image"
           folder="hobby-covers"
+          accept={IMAGE_ACCEPT}
           value={form.cover_image_url}
           onUploaded={(url) => updateField('cover_image_url', url)}
+          onClear={() => updateField('cover_image_url', '')}
         />
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="font-medium">Gallery Images</h3>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              updateField('media', [
-                ...form.media,
-                { key: crypto.randomUUID(), image_url: '', caption: '' },
-              ])
-            }
-          >
-            Add Image
-          </Button>
-        </div>
-        {form.media.map((item, index) => (
-          <div key={item.key} className="space-y-3 rounded-lg border p-4">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                disabled={index === 0}
-                onClick={() =>
-                  updateField('media', moveItem(form.media, index, -1))
-                }
-                aria-label="Move image up"
-              >
-                <ArrowUp />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                disabled={index === form.media.length - 1}
-                onClick={() =>
-                  updateField('media', moveItem(form.media, index, 1))
-                }
-                aria-label="Move image down"
-              >
-                <ArrowDown />
-              </Button>
-            </div>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="font-medium">Gallery Images</h3>
             <FileUploadField
-              label="Gallery image"
+              label="Upload images"
               folder="hobby-gallery"
-              value={item.image_url}
-              onUploaded={(url) => {
-                const next = [...form.media]
-                next[index] = { ...item, image_url: url }
-                updateField('media', next)
+              accept={IMAGE_ACCEPT}
+              multiple
+              value={null}
+              onUploaded={() => {}}
+              onUploadedMany={(urls) => {
+                updateMedia([
+                  ...form.media,
+                  ...urls.map((url) => ({
+                    key: crypto.randomUUID(),
+                    image_url: url,
+                    caption: '',
+                    alt_text: '',
+                  })),
+                ])
               }}
             />
-            <Input
-              placeholder="Image caption"
-              value={item.caption}
-              onChange={(event) => {
-                const next = [...form.media]
-                next[index] = { ...item, caption: event.target.value }
-                updateField('media', next)
-              }}
-            />
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={() =>
-                updateField(
-                  'media',
-                  form.media.filter((entry) => entry.key !== item.key),
-                )
-              }
-            >
-              Remove Image
-            </Button>
           </div>
-        ))}
+          {sortableMedia.length > 0 ? (
+            <SortableList
+              items={sortableMedia}
+              onReorder={(items) => {
+                updateMedia(
+                  items.map(({ id: _id, ...rest }) => rest),
+                )
+              }}
+              renderItem={(item, handleProps) => {
+                const index = sortableMedia.findIndex((m) => m.id === item.id)
+                return (
+                  <SortableItemShell className="p-4">
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        className="mt-1 shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+                        aria-label="Drag to reorder"
+                        {...handleProps.attributes}
+                        {...handleProps.listeners}
+                      >
+                        <GripVertical className="h-5 w-5" />
+                      </button>
+                      <ReorderControls
+                        className="shrink-0"
+                        disableUp={index <= 0}
+                        disableDown={index >= sortableMedia.length - 1}
+                        onMoveUp={() => {
+                          if (index <= 0) return
+                          updateMedia(
+                            arrayMove(form.media, index, index - 1),
+                          )
+                        }}
+                        onMoveDown={() => {
+                          if (index >= form.media.length - 1) return
+                          updateMedia(
+                            arrayMove(form.media, index, index + 1),
+                          )
+                        }}
+                      />
+                      <div className="min-w-0 flex-1 space-y-3">
+                        <FileUploadField
+                          label="Gallery image"
+                          folder="hobby-gallery"
+                          accept={IMAGE_ACCEPT}
+                          value={item.image_url}
+                          onUploaded={(url) => {
+                            const next = [...form.media]
+                            next[index] = { ...next[index], image_url: url }
+                            updateMedia(next)
+                          }}
+                        />
+                        <Input
+                          placeholder="Image caption"
+                          value={item.caption}
+                          onChange={(event) => {
+                            const next = [...form.media]
+                            next[index] = {
+                              ...next[index],
+                              caption: event.target.value,
+                            }
+                            updateMedia(next)
+                          }}
+                        />
+                        <Input
+                          placeholder="Alt text"
+                          value={item.alt_text}
+                          onChange={(event) => {
+                            const next = [...form.media]
+                            next[index] = {
+                              ...next[index],
+                              alt_text: event.target.value,
+                            }
+                            updateMedia(next)
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() =>
+                            updateMedia(
+                              form.media.filter((entry) => entry.key !== item.key),
+                            )
+                          }
+                        >
+                          Remove Image
+                        </Button>
+                      </div>
+                    </div>
+                  </SortableItemShell>
+                )
+              }}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Upload one or more images to build the gallery.
+            </p>
+          )}
+        </div>
       </section>
 
       <section className="space-y-4 rounded-xl border bg-card p-5">

@@ -40,7 +40,7 @@ export function ProjectDetailPage() {
         description="This project is unavailable or not published."
         action={
           <Button asChild variant="outline">
-            <Link to="/projects">Back to projects</Link>
+            <Link to="/#projects">Back to projects</Link>
           </Button>
         }
       />

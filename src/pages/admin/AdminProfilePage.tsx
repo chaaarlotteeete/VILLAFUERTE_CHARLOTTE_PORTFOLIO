@@ -206,6 +206,34 @@ export function AdminProfilePage() {
             />
           </div>
           <div className="space-y-2">
+            <Label htmlFor="specialization">Specialization</Label>
+            <Input
+              id="specialization"
+              value={profile.specialization ?? ''}
+              onChange={(event) =>
+                setProfile((current) => ({
+                  ...current,
+                  specialization: event.target.value,
+                }))
+              }
+              placeholder="e.g. Full-Stack & Systems"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="technical_interests">Technical interests</Label>
+            <Input
+              id="technical_interests"
+              value={profile.technical_interests ?? ''}
+              onChange={(event) =>
+                setProfile((current) => ({
+                  ...current,
+                  technical_interests: event.target.value,
+                }))
+              }
+              placeholder="Comma-separated or short phrase"
+            />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="github">GitHub</Label>
             <Input
               id="github"

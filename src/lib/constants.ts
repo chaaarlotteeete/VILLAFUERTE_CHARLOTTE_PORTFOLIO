@@ -39,15 +39,14 @@ export const HOBBY_CATEGORIES = [
 ] as const
 
 export const PUBLIC_NAV = [
-  { label: 'Home', href: '/' },
-  { label: 'About', href: '/about' },
-  { label: 'Projects', href: '/projects' },
-  { label: 'Skills', href: '/skills' },
-  { label: 'Experience', href: '/experience' },
-  { label: 'Education', href: '/education' },
-  { label: 'Hobbies', href: '/hobbies' },
-  { label: 'Certifications', href: '/certifications' },
-  { label: 'Contact', href: '/contact' },
+  { label: 'Home', href: '/#home' },
+  { label: 'About', href: '/#about' },
+  { label: 'Projects', href: '/#featured-projects' },
+  { label: 'Skills', href: '/#skills' },
+  { label: 'Experience', href: '/#experience' },
+  { label: 'Hobbies', href: '/#hobbies' },
+  { label: 'Certifications', href: '/#certifications' },
+  { label: 'Contact', href: '/#contact' },
 ] as const
 
 /** @deprecated Prefer ADMIN_PRIMARY_NAV from `@/lib/admin-nav` for the CMS shell. */
@@ -57,6 +56,8 @@ export const ADMIN_NAV = [
   { label: 'Skills & Technologies', href: '/admin/skills' },
   { label: 'Experience', href: '/admin/experience' },
   { label: 'Education', href: '/admin/education' },
+  { label: 'Training', href: '/admin/training' },
+  { label: 'Awards & Achievements', href: '/admin/awards' },
   { label: 'Hobbies & Interests', href: '/admin/hobbies' },
   { label: 'Certifications', href: '/admin/certifications' },
   { label: 'Resume', href: '/admin/resume' },

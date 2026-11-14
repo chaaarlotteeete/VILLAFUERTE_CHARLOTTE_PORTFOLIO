@@ -11,6 +11,9 @@ export { fetchCertifications } from '@/services/certifications'
 export { fetchEducation } from '@/services/education'
 export { fetchExperiences } from '@/services/experience'
 export { fetchHomepageData } from '@/services/homepage'
+export { fetchPortfolioData } from '@/services/portfolio'
+export type { PortfolioData } from '@/services/portfolio'
+export * from '@/services/cms'
 export { fetchProfile } from '@/services/profile'
 export {
   fetchFeaturedProjects,

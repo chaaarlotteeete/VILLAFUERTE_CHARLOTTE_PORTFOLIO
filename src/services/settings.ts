@@ -1,10 +1,17 @@
 import { supabase } from '@/lib/supabase'
 
+export interface CredentialsDisplaySettings {
+  show_certifications_group: boolean
+  show_awards_group: boolean
+}
+
 export interface HomepageSettings {
   show_featured_projects: boolean
   show_highlighted_skills: boolean
   show_hobbies: boolean
   show_certifications: boolean
+  show_about: boolean
+  show_experience: boolean
   section_order: string[]
   featured_limit: number
 }
@@ -20,6 +27,8 @@ const defaultHomepage: HomepageSettings = {
   show_highlighted_skills: true,
   show_hobbies: true,
   show_certifications: true,
+  show_about: true,
+  show_experience: true,
   section_order: ['featured', 'skills', 'hobbies', 'certifications'],
   featured_limit: 6,
 }
@@ -64,6 +73,14 @@ export async function fetchHomepageSettings(): Promise<HomepageSettings> {
       value.show_certifications === undefined
         ? defaultHomepage.show_certifications
         : Boolean(value.show_certifications),
+    show_about:
+      value.show_about === undefined
+        ? defaultHomepage.show_about
+        : Boolean(value.show_about),
+    show_experience:
+      value.show_experience === undefined
+        ? defaultHomepage.show_experience
+        : Boolean(value.show_experience),
     section_order: Array.isArray(value.section_order)
       ? (value.section_order as string[])
       : defaultHomepage.section_order,
@@ -71,6 +88,36 @@ export async function fetchHomepageSettings(): Promise<HomepageSettings> {
       typeof value.featured_limit === 'number'
         ? value.featured_limit
         : defaultHomepage.featured_limit,
+  }
+}
+
+function parseSiteSettingBoolean(value: unknown, defaultValue: boolean) {
+  if (value === undefined || value === null) return defaultValue
+  if (typeof value === 'boolean') return value
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return defaultValue
+}
+
+export async function fetchCredentialsDisplaySettings(): Promise<CredentialsDisplaySettings> {
+  const keys = ['show_certifications_group', 'show_awards_group'] as const
+  const { data, error } = await supabase
+    .from('site_settings')
+    .select('key, value')
+    .in('key', [...keys])
+
+  if (error) throw new Error(error.message)
+
+  const map = new Map(
+    (data ?? []).map((row) => [row.key as string, row.value]),
+  )
+
+  return {
+    show_certifications_group: parseSiteSettingBoolean(
+      map.get('show_certifications_group'),
+      true,
+    ),
+    show_awards_group: parseSiteSettingBoolean(map.get('show_awards_group'), true),
   }
 }
 

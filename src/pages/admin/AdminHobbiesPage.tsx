@@ -1,9 +1,15 @@
-import { Eye, Pencil } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Eye, GripVertical, Pencil } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
+import { arrayMove } from '@dnd-kit/sortable'
 
 import { ConfirmDeleteButton } from '@/components/admin/ConfirmDeleteButton'
+import { ReorderControls } from '@/components/admin/ReorderControls'
+import {
+  SortableItemShell,
+  SortableList,
+} from '@/components/admin/SortableList'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
@@ -21,12 +27,14 @@ import {
 } from '@/components/ui/select'
 import { useAsyncData } from '@/hooks/useAsyncData'
 import { HOBBY_CATEGORIES } from '@/lib/constants'
+import { fetchHobbyCategories } from '@/services/catalogs'
 import {
   deleteHobby,
   fetchAdminHobbies,
+  reorderHobbies,
   updateHobbyFlags,
 } from '@/services/adminHobbies'
-import type { Hobby } from '@/types/database'
+import type { Hobby, HobbyCategory } from '@/types/database'
 import { formatDate } from '@/utils/date'
 
 type SortKey = 'updated_desc' | 'name_asc' | 'order_asc'
@@ -37,9 +45,49 @@ export function AdminHobbiesPage() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [sort, setSort] = useState<SortKey>('order_asc')
   const [viewing, setViewing] = useState<Hobby | null>(null)
+  const [dbCategories, setDbCategories] = useState<HobbyCategory[]>([])
+  const [orderedHobbies, setOrderedHobbies] = useState<Hobby[]>([])
+  const [reordering, setReordering] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    void fetchHobbyCategories()
+      .then((rows) => {
+        if (active) setDbCategories(rows)
+      })
+      .catch(() => {
+        /* fallback to hobby-derived categories */
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!data) return
+    setOrderedHobbies(
+      [...data].sort((a, b) => a.display_order - b.display_order),
+    )
+  }, [data])
+
+  const categoryOptions = useMemo(() => {
+    if (dbCategories.length > 0) {
+      return dbCategories.map((cat) => cat.name)
+    }
+    const fromHobbies = [...new Set((data ?? []).map((h) => h.category))]
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b))
+    if (fromHobbies.length > 0) return fromHobbies
+    return [...HOBBY_CATEGORIES]
+  }, [dbCategories, data])
 
   const hobbies = useMemo(() => {
-    let list = [...(data ?? [])]
+    const source =
+      sort === 'order_asc' && categoryFilter === 'all' && !search.trim()
+        ? orderedHobbies
+        : [...(data ?? [])]
+
+    let list = [...source]
     const query = search.trim().toLowerCase()
     if (query) {
       list = list.filter((hobby) =>
@@ -51,19 +99,44 @@ export function AdminHobbiesPage() {
     if (categoryFilter !== 'all') {
       list = list.filter((hobby) => hobby.category === categoryFilter)
     }
-    list.sort((a, b) => {
-      switch (sort) {
-        case 'name_asc':
-          return a.name.localeCompare(b.name)
-        case 'updated_desc':
-          return b.updated_at.localeCompare(a.updated_at)
-        case 'order_asc':
-        default:
-          return a.display_order - b.display_order
-      }
-    })
+    if (
+      sort !== 'order_asc' ||
+      categoryFilter !== 'all' ||
+      search.trim()
+    ) {
+      list.sort((a, b) => {
+        switch (sort) {
+          case 'name_asc':
+            return a.name.localeCompare(b.name)
+          case 'updated_desc':
+            return b.updated_at.localeCompare(a.updated_at)
+          case 'order_asc':
+          default:
+            return a.display_order - b.display_order
+        }
+      })
+    }
     return list
-  }, [data, search, categoryFilter, sort])
+  }, [data, orderedHobbies, search, categoryFilter, sort])
+
+  const canDragReorder =
+    sort === 'order_asc' && categoryFilter === 'all' && !search.trim()
+
+  async function applyReorder(next: Hobby[]) {
+    const previous = orderedHobbies
+    setOrderedHobbies(next)
+    setReordering(true)
+    try {
+      await reorderHobbies(next.map((hobby) => hobby.id))
+      toast.success('Order updated')
+    } catch (err) {
+      setOrderedHobbies(previous)
+      toast.error(err instanceof Error ? err.message : 'Failed to update order')
+      reload()
+    } finally {
+      setReordering(false)
+    }
+  }
 
   async function toggleVisibility(hobby: Hobby) {
     try {
@@ -109,7 +182,7 @@ export function AdminHobbiesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All categories</SelectItem>
-            {HOBBY_CATEGORIES.map((category) => (
+            {categoryOptions.map((category) => (
               <SelectItem key={category} value={category}>
                 {category}
               </SelectItem>
@@ -140,6 +213,52 @@ export function AdminHobbiesPage() {
         />
       ) : hobbies.length === 0 ? (
         <EmptyState title="No matching hobbies" />
+      ) : canDragReorder ? (
+        <SortableList
+          items={hobbies}
+          disabled={reordering}
+          onReorder={(items) => void applyReorder(items)}
+          renderItem={(hobby, handleProps) => {
+            const index = hobbies.findIndex((item) => item.id === hobby.id)
+            return (
+              <SortableItemShell className="p-4">
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="mt-1 shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+                    aria-label="Drag to reorder"
+                    {...handleProps.attributes}
+                    {...handleProps.listeners}
+                  >
+                    <GripVertical className="h-5 w-5" />
+                  </button>
+                  <ReorderControls
+                    className="shrink-0"
+                    disableUp={index <= 0}
+                    disableDown={index >= hobbies.length - 1}
+                    onMoveUp={() => {
+                      if (index <= 0) return
+                      void applyReorder(arrayMove(hobbies, index, index - 1))
+                    }}
+                    onMoveDown={() => {
+                      if (index >= hobbies.length - 1) return
+                      void applyReorder(arrayMove(hobbies, index, index + 1))
+                    }}
+                  />
+                  <HobbyCardBody hobby={hobby} />
+                  <div className="ml-auto shrink-0 self-start">
+                    <HobbyActions
+                      hobby={hobby}
+                      onView={() => setViewing(hobby)}
+                      onToggleVisibility={() => void toggleVisibility(hobby)}
+                      onDeleted={reload}
+                    />
+                  </div>
+                </div>
+              </SortableItemShell>
+            )
+          }}
+        />
       ) : (
         <>
           <div className="hidden overflow-x-auto rounded-xl border bg-card md:block">
@@ -200,29 +319,7 @@ export function AdminHobbiesPage() {
           <div className="space-y-3 md:hidden">
             {hobbies.map((hobby) => (
               <div key={hobby.id} className="rounded-xl border bg-card p-4">
-                <div className="flex gap-3">
-                  {hobby.cover_image_url ? (
-                    <img
-                      src={hobby.cover_image_url}
-                      alt=""
-                      className="size-16 rounded-md border object-cover"
-                    />
-                  ) : (
-                    <div className="flex size-16 items-center justify-center rounded-md border bg-muted text-xs">
-                      {hobby.icon || 'N/A'}
-                    </div>
-                  )}
-                  <div>
-                    <p className="font-medium">{hobby.name}</p>
-                    <p className="text-sm text-muted-foreground">{hobby.category}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge variant={hobby.is_visible ? 'success' : 'secondary'}>
-                        {hobby.is_visible ? 'Visible' : 'Hidden'}
-                      </Badge>
-                      <Badge variant="outline">Order {hobby.display_order}</Badge>
-                    </div>
-                  </div>
-                </div>
+                <HobbyCardBody hobby={hobby} />
                 <div className="mt-4">
                   <HobbyActions
                     hobby={hobby}
@@ -272,6 +369,34 @@ export function AdminHobbiesPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function HobbyCardBody({ hobby }: { hobby: Hobby }) {
+  return (
+    <div className="flex min-w-0 flex-1 gap-3">
+      {hobby.cover_image_url ? (
+        <img
+          src={hobby.cover_image_url}
+          alt=""
+          className="size-16 shrink-0 rounded-md border object-cover"
+        />
+      ) : (
+        <div className="flex size-16 shrink-0 items-center justify-center rounded-md border bg-muted text-xs">
+          {hobby.icon || 'N/A'}
+        </div>
+      )}
+      <div className="min-w-0">
+        <p className="font-medium">{hobby.name}</p>
+        <p className="text-sm text-muted-foreground">{hobby.category}</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Badge variant={hobby.is_visible ? 'success' : 'secondary'}>
+            {hobby.is_visible ? 'Visible' : 'Hidden'}
+          </Badge>
+          <Badge variant="outline">Order {hobby.display_order}</Badge>
+        </div>
+      </div>
     </div>
   )
 }

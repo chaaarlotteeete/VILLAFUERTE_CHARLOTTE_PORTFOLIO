@@ -2,6 +2,40 @@ export type ProjectType = 'Individual' | 'Group' | 'Capstone' | 'Academic'
 export type ProjectPlatform = 'Web' | 'Mobile' | 'Web and Mobile'
 export type ProjectStatus = 'Ongoing' | 'Completed' | 'Archived'
 
+export type EducationStatus =
+  | 'currently_studying'
+  | 'completed'
+  | 'incomplete'
+  | 'discontinued'
+  | 'on_hold'
+
+export type DatePrecision = 'year' | 'month'
+
+export type TrainingType =
+  | 'TESDA Training'
+  | 'Short Course'
+  | 'Bootcamp'
+  | 'Workshop'
+  | 'Seminar'
+  | 'Professional Development'
+  | 'Other'
+
+export type TrainingStatus =
+  | 'currently_attending'
+  | 'completed'
+  | 'incomplete'
+  | 'discontinued'
+  | 'on_hold'
+
+export type CertificationType =
+  | 'National Certificate I (NC I)'
+  | 'National Certificate II (NC II)'
+  | 'National Certificate III (NC III)'
+  | 'National Certificate IV (NC IV)'
+  | 'Certificate of Competency (COC)'
+  | 'Training Certificate'
+  | 'Other'
+
 export type Json =
   | string
   | number
@@ -326,6 +360,7 @@ export interface Database {
           is_current: boolean
           description: string | null
           achievements: string | null
+          is_visible: boolean
           display_order: number
           created_at: string
           updated_at: string
@@ -339,6 +374,7 @@ export interface Database {
           is_current?: boolean
           description?: string | null
           achievements?: string | null
+          is_visible?: boolean
           display_order?: number
           created_at?: string
           updated_at?: string
@@ -352,7 +388,239 @@ export interface Database {
           is_current?: boolean
           description?: string | null
           achievements?: string | null
+          is_visible?: boolean
           display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      education_levels: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          display_order: number
+          is_visible: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          display_order?: number
+          is_visible?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          display_order?: number
+          is_visible?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      education_tracks: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          display_order: number
+          is_visible: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          display_order?: number
+          is_visible?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          display_order?: number
+          is_visible?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      education_strands: {
+        Row: {
+          id: string
+          track_id: string | null
+          name: string
+          slug: string
+          display_order: number
+          is_visible: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          track_id?: string | null
+          name: string
+          slug: string
+          display_order?: number
+          is_visible?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          track_id?: string | null
+          name?: string
+          slug?: string
+          display_order?: number
+          is_visible?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      degree_options: {
+        Row: {
+          id: string
+          education_level_id: string
+          name: string
+          slug: string
+          display_order: number
+          is_visible: boolean
+          is_custom: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          education_level_id: string
+          name: string
+          slug: string
+          display_order?: number
+          is_visible?: boolean
+          is_custom?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          education_level_id?: string
+          name?: string
+          slug?: string
+          display_order?: number
+          is_visible?: boolean
+          is_custom?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hobby_categories: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          display_order: number
+          is_visible: boolean
+          is_custom: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          display_order?: number
+          is_visible?: boolean
+          is_custom?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          display_order?: number
+          is_visible?: boolean
+          is_custom?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hobby_options: {
+        Row: {
+          id: string
+          hobby_category_id: string
+          name: string
+          slug: string
+          display_order: number
+          is_visible: boolean
+          is_custom: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          hobby_category_id: string
+          name: string
+          slug: string
+          display_order?: number
+          is_visible?: boolean
+          is_custom?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          hobby_category_id?: string
+          name?: string
+          slug?: string
+          display_order?: number
+          is_visible?: boolean
+          is_custom?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      award_categories: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          display_order: number
+          is_visible: boolean
+          is_custom: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          display_order?: number
+          is_visible?: boolean
+          is_custom?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          display_order?: number
+          is_visible?: boolean
+          is_custom?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -368,7 +636,26 @@ export interface Database {
           end_date: string | null
           is_current: boolean
           description: string | null
+          is_visible: boolean
           display_order: number
+          education_level_id: string | null
+          custom_education_level: string | null
+          degree_option_id: string | null
+          school_address: string | null
+          city: string | null
+          province: string | null
+          country: string | null
+          school_logo_url: string | null
+          track_id: string | null
+          strand_id: string | null
+          custom_track: string | null
+          custom_strand: string | null
+          academic_highlights: string | null
+          status: EducationStatus
+          expected_graduation: string | null
+          start_date_precision: DatePrecision
+          end_date_precision: DatePrecision
+          expected_graduation_precision: DatePrecision
           created_at: string
           updated_at: string
         }
@@ -381,7 +668,26 @@ export interface Database {
           end_date?: string | null
           is_current?: boolean
           description?: string | null
+          is_visible?: boolean
           display_order?: number
+          education_level_id?: string | null
+          custom_education_level?: string | null
+          degree_option_id?: string | null
+          school_address?: string | null
+          city?: string | null
+          province?: string | null
+          country?: string | null
+          school_logo_url?: string | null
+          track_id?: string | null
+          strand_id?: string | null
+          custom_track?: string | null
+          custom_strand?: string | null
+          academic_highlights?: string | null
+          status?: EducationStatus
+          expected_graduation?: string | null
+          start_date_precision?: DatePrecision
+          end_date_precision?: DatePrecision
+          expected_graduation_precision?: DatePrecision
           created_at?: string
           updated_at?: string
         }
@@ -394,7 +700,26 @@ export interface Database {
           end_date?: string | null
           is_current?: boolean
           description?: string | null
+          is_visible?: boolean
           display_order?: number
+          education_level_id?: string | null
+          custom_education_level?: string | null
+          degree_option_id?: string | null
+          school_address?: string | null
+          city?: string | null
+          province?: string | null
+          country?: string | null
+          school_logo_url?: string | null
+          track_id?: string | null
+          strand_id?: string | null
+          custom_track?: string | null
+          custom_strand?: string | null
+          academic_highlights?: string | null
+          status?: EducationStatus
+          expected_graduation?: string | null
+          start_date_precision?: DatePrecision
+          end_date_precision?: DatePrecision
+          expected_graduation_precision?: DatePrecision
           created_at?: string
           updated_at?: string
         }
@@ -411,6 +736,8 @@ export interface Database {
           cover_image_url: string | null
           is_visible: boolean
           display_order: number
+          hobby_category_id: string | null
+          hobby_option_id: string | null
           created_at: string
           updated_at: string
         }
@@ -424,6 +751,8 @@ export interface Database {
           cover_image_url?: string | null
           is_visible?: boolean
           display_order?: number
+          hobby_category_id?: string | null
+          hobby_option_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -437,6 +766,8 @@ export interface Database {
           cover_image_url?: string | null
           is_visible?: boolean
           display_order?: number
+          hobby_category_id?: string | null
+          hobby_option_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -448,6 +779,7 @@ export interface Database {
           hobby_id: string
           image_url: string
           caption: string | null
+          alt_text: string | null
           display_order: number
           created_at: string
         }
@@ -456,6 +788,7 @@ export interface Database {
           hobby_id: string
           image_url: string
           caption?: string | null
+          alt_text?: string | null
           display_order?: number
           created_at?: string
         }
@@ -464,8 +797,198 @@ export interface Database {
           hobby_id?: string
           image_url?: string
           caption?: string | null
+          alt_text?: string | null
           display_order?: number
           created_at?: string
+        }
+        Relationships: []
+      }
+      training_records: {
+        Row: {
+          id: string
+          title: string
+          provider: string
+          training_type: TrainingType
+          qualification_code: string | null
+          description: string | null
+          location: string | null
+          start_date: string | null
+          completion_date: string | null
+          is_current: boolean
+          expected_completion: string | null
+          training_hours: number | null
+          completion_status: TrainingStatus
+          document_url: string | null
+          is_visible: boolean
+          display_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          provider: string
+          training_type?: TrainingType
+          qualification_code?: string | null
+          description?: string | null
+          location?: string | null
+          start_date?: string | null
+          completion_date?: string | null
+          is_current?: boolean
+          expected_completion?: string | null
+          training_hours?: number | null
+          completion_status?: TrainingStatus
+          document_url?: string | null
+          is_visible?: boolean
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          provider?: string
+          training_type?: TrainingType
+          qualification_code?: string | null
+          description?: string | null
+          location?: string | null
+          start_date?: string | null
+          completion_date?: string | null
+          is_current?: boolean
+          expected_completion?: string | null
+          training_hours?: number | null
+          completion_status?: TrainingStatus
+          document_url?: string | null
+          is_visible?: boolean
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      awards: {
+        Row: {
+          id: string
+          title: string
+          award_category_id: string | null
+          custom_category: string | null
+          issuer: string | null
+          description: string | null
+          received_at: string | null
+          education_id: string | null
+          experience_id: string | null
+          project_id: string | null
+          image_url: string | null
+          credential_url: string | null
+          is_visible: boolean
+          display_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          award_category_id?: string | null
+          custom_category?: string | null
+          issuer?: string | null
+          description?: string | null
+          received_at?: string | null
+          education_id?: string | null
+          experience_id?: string | null
+          project_id?: string | null
+          image_url?: string | null
+          credential_url?: string | null
+          is_visible?: boolean
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          award_category_id?: string | null
+          custom_category?: string | null
+          issuer?: string | null
+          description?: string | null
+          received_at?: string | null
+          education_id?: string | null
+          experience_id?: string | null
+          project_id?: string | null
+          image_url?: string | null
+          credential_url?: string | null
+          is_visible?: boolean
+          display_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      education_awards: {
+        Row: {
+          education_id: string
+          award_id: string
+          created_at: string
+        }
+        Insert: {
+          education_id: string
+          award_id: string
+          created_at?: string
+        }
+        Update: {
+          education_id?: string
+          award_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      media_assets: {
+        Row: {
+          id: string
+          bucket: string
+          storage_path: string
+          public_url: string | null
+          file_name: string
+          mime_type: string | null
+          file_size: number | null
+          alt_text: string | null
+          caption: string | null
+          folder: string | null
+          is_public: boolean
+          uploaded_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          bucket: string
+          storage_path: string
+          public_url?: string | null
+          file_name: string
+          mime_type?: string | null
+          file_size?: number | null
+          alt_text?: string | null
+          caption?: string | null
+          folder?: string | null
+          is_public?: boolean
+          uploaded_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          bucket?: string
+          storage_path?: string
+          public_url?: string | null
+          file_name?: string
+          mime_type?: string | null
+          file_size?: number | null
+          alt_text?: string | null
+          caption?: string | null
+          folder?: string | null
+          is_public?: boolean
+          uploaded_by?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -480,6 +1003,13 @@ export interface Database {
           category: string | null
           is_visible: boolean
           display_order: number
+          certification_type: CertificationType | null
+          qualification_name: string | null
+          credential_number: string | null
+          expires_at: string | null
+          show_credential_number: boolean
+          training_record_id: string | null
+          document_url: string | null
           created_at: string
           updated_at: string
         }
@@ -493,6 +1023,13 @@ export interface Database {
           category?: string | null
           is_visible?: boolean
           display_order?: number
+          certification_type?: CertificationType | null
+          qualification_name?: string | null
+          credential_number?: string | null
+          expires_at?: string | null
+          show_credential_number?: boolean
+          training_record_id?: string | null
+          document_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -506,6 +1043,13 @@ export interface Database {
           category?: string | null
           is_visible?: boolean
           display_order?: number
+          certification_type?: CertificationType | null
+          qualification_name?: string | null
+          credential_number?: string | null
+          expires_at?: string | null
+          show_credential_number?: boolean
+          training_record_id?: string | null
+          document_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -662,6 +1206,10 @@ export type Technology = Tables<'technologies'>
 export type Skill = Tables<'skills'>
 export type Experience = Tables<'experiences'>
 export type Education = Tables<'education'>
+export type EducationLevel = Tables<'education_levels'>
+export type EducationTrack = Tables<'education_tracks'>
+export type EducationStrand = Tables<'education_strands'>
+export type DegreeOption = Tables<'degree_options'>
 export type Certification = Tables<'certifications'>
 export type Resume = Tables<'resumes'>
 export type SocialLink = Tables<'social_links'>
@@ -670,3 +1218,10 @@ export type SiteSetting = Tables<'site_settings'>
 export type AdminUser = Tables<'admin_users'>
 export type Hobby = Tables<'hobbies'>
 export type HobbyMedia = Tables<'hobby_media'>
+export type HobbyCategory = Tables<'hobby_categories'>
+export type HobbyOption = Tables<'hobby_options'>
+export type AwardCategory = Tables<'award_categories'>
+export type Award = Tables<'awards'>
+export type TrainingRecord = Tables<'training_records'>
+export type EducationAward = Tables<'education_awards'>
+export type MediaAsset = Tables<'media_assets'>

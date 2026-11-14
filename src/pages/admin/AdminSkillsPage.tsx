@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useAsyncData } from '@/hooks/useAsyncData'
+import { DEFAULT_SKILL_FILTERS } from '@/lib/cms-defaults'
 import { SKILL_CATEGORIES } from '@/lib/constants'
 import {
   deleteSkill,
@@ -30,11 +31,24 @@ import {
   fetchTechnologies,
   upsertTechnology,
 } from '@/services/adminProjects'
+import {
+  deleteSkillCategory,
+  fetchSkillCategories,
+  saveSkillCategory,
+  type SkillCategory,
+} from '@/services/cms'
 import type { Skill } from '@/types/database'
+
+const fallbackCategories = [
+  ...new Set([
+    ...SKILL_CATEGORIES,
+    ...DEFAULT_SKILL_FILTERS.filter((item) => item.key !== 'all').map((item) => item.key),
+  ]),
+]
 
 const emptySkill = {
   name: '',
-  category: SKILL_CATEGORIES[0] as string,
+  category: fallbackCategories[0] as string,
   icon: '',
   is_visible: true,
   display_order: 0,
@@ -43,6 +57,13 @@ const emptySkill = {
 export function AdminSkillsPage() {
   const skillsQuery = useAsyncData(fetchAdminSkills)
   const techQuery = useAsyncData(fetchTechnologies)
+  const categoriesQuery = useAsyncData(async () => {
+    try {
+      return await fetchSkillCategories()
+    } catch {
+      return [] as SkillCategory[]
+    }
+  })
 
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -50,6 +71,8 @@ export function AdminSkillsPage() {
   const [form, setForm] = useState(emptySkill)
   const [techName, setTechName] = useState('')
   const [techCategory, setTechCategory] = useState('')
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [newCategoryLabel, setNewCategoryLabel] = useState('')
 
   const skills = useMemo(() => {
     let list = [...(skillsQuery.data ?? [])]
@@ -67,7 +90,9 @@ export function AdminSkillsPage() {
     return list
   }, [skillsQuery.data, search, categoryFilter])
 
-  if (skillsQuery.loading || techQuery.loading) return <LoadingState rows={4} />
+  if (skillsQuery.loading || techQuery.loading || categoriesQuery.loading) {
+    return <LoadingState rows={4} />
+  }
   if (skillsQuery.error) {
     return <ErrorState message={skillsQuery.error} onRetry={skillsQuery.reload} />
   }
@@ -77,6 +102,37 @@ export function AdminSkillsPage() {
 
   const allSkills = skillsQuery.data ?? []
   const technologies = techQuery.data ?? []
+  const dbCategories = categoriesQuery.data ?? []
+  const categoryOptions =
+    dbCategories.length > 0
+      ? dbCategories.map((category) => category.name)
+      : [
+          ...new Set([
+            ...fallbackCategories,
+            ...allSkills.map((skill) => skill.category),
+          ]),
+        ]
+
+  async function handleSaveCategory() {
+    if (!newCategoryName.trim()) {
+      toast.error('Category name is required')
+      return
+    }
+    try {
+      await saveSkillCategory({
+        name: newCategoryName.trim(),
+        label: newCategoryLabel.trim() || newCategoryName.trim(),
+        display_order: (dbCategories.length + 1) * 10,
+        is_visible: true,
+      })
+      toast.success('Category added')
+      setNewCategoryName('')
+      setNewCategoryLabel('')
+      categoriesQuery.reload()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save category')
+    }
+  }
 
   function startEdit(skill: Skill) {
     setEditingId(skill.id)
@@ -138,6 +194,90 @@ export function AdminSkillsPage() {
       />
 
       <section className="space-y-4 rounded-xl border bg-card p-5">
+        <h2 className="text-lg font-semibold">Skill categories</h2>
+        <p className="text-sm text-muted-foreground">
+          Public skill filters are generated from visible categories that have skills.
+        </p>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="space-y-2">
+            <Label>Category key / name</Label>
+            <Input
+              value={newCategoryName}
+              onChange={(event) => setNewCategoryName(event.target.value)}
+              placeholder="Frontend Development"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Public label</Label>
+            <Input
+              value={newCategoryLabel}
+              onChange={(event) => setNewCategoryLabel(event.target.value)}
+              placeholder="Frontend Development"
+            />
+          </div>
+          <div className="flex items-end">
+            <Button type="button" onClick={() => void handleSaveCategory()}>
+              Add category
+            </Button>
+          </div>
+        </div>
+        {dbCategories.length > 0 ? (
+          <div className="space-y-2">
+            {dbCategories.map((category) => (
+              <div
+                key={category.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2"
+              >
+                <div>
+                  <p className="font-medium">{category.label}</p>
+                  <p className="text-xs text-muted-foreground">{category.name}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Switch
+                      checked={category.is_visible}
+                      onCheckedChange={(checked) => {
+                        void saveSkillCategory({
+                          id: category.id,
+                          name: category.name,
+                          label: category.label,
+                          is_visible: checked,
+                          display_order: category.display_order,
+                        })
+                          .then(() => {
+                            toast.success('Category updated')
+                            categoriesQuery.reload()
+                          })
+                          .catch((err) =>
+                            toast.error(
+                              err instanceof Error ? err.message : 'Update failed',
+                            ),
+                          )
+                      }}
+                    />
+                    Visible
+                  </label>
+                  <ConfirmDeleteButton
+                    label="Delete category"
+                    onConfirm={async () => {
+                      await deleteSkillCategory(category.id)
+                      toast.success('Category deleted')
+                      categoriesQuery.reload()
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Apply the CMS migration to manage categories in the database. Until then,
+            built-in category names are used.
+          </p>
+        )}
+      </section>
+
+      <section className="space-y-4 rounded-xl border bg-card p-5">
         <h2 className="text-lg font-semibold">
           {editingId ? 'Edit Skill' : 'Add Skill'}
         </h2>
@@ -159,7 +299,7 @@ export function AdminSkillsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {SKILL_CATEGORIES.map((category) => (
+                {categoryOptions.map((category) => (
                   <SelectItem key={category} value={category}>
                     {category}
                   </SelectItem>
@@ -220,7 +360,7 @@ export function AdminSkillsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All categories</SelectItem>
-              {SKILL_CATEGORIES.map((category) => (
+              {categoryOptions.map((category) => (
                 <SelectItem key={category} value={category}>
                   {category}
                 </SelectItem>

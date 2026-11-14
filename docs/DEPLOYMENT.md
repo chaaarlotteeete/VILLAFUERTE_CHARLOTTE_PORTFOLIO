@@ -69,6 +69,20 @@ The workflow:
 3. Prepares `.nojekyll` + SPA `404.html`
 4. Deploys the `dist/` artifact to GitHub Pages
 
+## 5b. Apply CMS database migrations
+
+After pulling CMS updates, run new SQL in the Supabase SQL Editor (additive; does not delete portfolio rows):
+
+1. `supabase/migrations/20260316000000_cms_architecture.sql` — page sections, navigation, skill categories
+2. `supabase/migrations/20260317000000_education_training_hobbies_awards.sql` — education catalogs, training, awards, hobby options, certification TESDA fields
+3. `supabase/migrations/20260317000001_education_date_precision.sql` — education year-only date precision
+4. `supabase/migrations/20260317000002_education_shs_tracks_strands.sql` — SHS track/strand catalog cleanup
+5. Or re-run the matching blocks at the end of `supabase/APPLY_ALL.sql`
+
+Confirm tables/columns exist as needed: `education_levels`, `degree_options`, `training_records`, `awards`, `hobby_categories`, `hobby_options`, and new columns on `education` / `certifications` / `hobbies`.
+
+Content edits in Admin (Education, Training, Awards, Hobbies, Certifications, Website Content) publish to Supabase and appear on the public site **without** a GitHub Pages redeploy.
+
 ## 6. Post-deploy verification checklist
 
 - [ ] Homepage loads at the Pages URL

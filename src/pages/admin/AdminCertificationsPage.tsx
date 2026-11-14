@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 
 import { ConfirmDeleteButton } from '@/components/admin/ConfirmDeleteButton'
 import { FileUploadField } from '@/components/admin/FileUploadField'
+import { MonthYearPicker } from '@/components/admin/MonthYearPicker'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
@@ -11,6 +12,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useAsyncData } from '@/hooks/useAsyncData'
 import {
@@ -18,21 +26,42 @@ import {
   fetchAdminCertifications,
   saveCertification,
 } from '@/services/adminContent'
-import type { Certification } from '@/types/database'
-import { formatDate } from '@/utils/date'
+import { fetchAdminTraining } from '@/services/adminTraining'
+import type { Certification, CertificationType } from '@/types/database'
+import { formatDate, fromMonthValue, toMonthValue } from '@/utils/date'
+
+const CERTIFICATION_TYPES: CertificationType[] = [
+  'National Certificate I (NC I)',
+  'National Certificate II (NC II)',
+  'National Certificate III (NC III)',
+  'National Certificate IV (NC IV)',
+  'Certificate of Competency (COC)',
+  'Training Certificate',
+  'Other',
+]
+
+const TRAINING_NONE = '__none__'
 
 const empty = {
   title: '',
   issuer: '',
   issued_at: '',
+  expires_at: '',
   credential_url: '',
   image_url: '',
+  document_url: '',
   category: '',
+  certification_type: '' as CertificationType | '',
+  qualification_name: '',
+  credential_number: '',
+  show_credential_number: false,
+  training_record_id: TRAINING_NONE,
   is_visible: true,
 }
 
 export function AdminCertificationsPage() {
   const { data, error, loading, reload } = useAsyncData(fetchAdminCertifications)
+  const { data: trainingRecords } = useAsyncData(fetchAdminTraining)
   const [form, setForm] = useState(empty)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -41,6 +70,7 @@ export function AdminCertificationsPage() {
   if (error) return <ErrorState message={error} onRetry={reload} />
 
   const items = data ?? []
+  const training = trainingRecords ?? []
 
   function reset() {
     setForm(empty)
@@ -54,10 +84,17 @@ export function AdminCertificationsPage() {
     setForm({
       title: item.title,
       issuer: item.issuer,
-      issued_at: item.issued_at ?? '',
+      issued_at: toMonthValue(item.issued_at),
+      expires_at: toMonthValue(item.expires_at),
       credential_url: item.credential_url ?? '',
       image_url: item.image_url ?? '',
+      document_url: item.document_url ?? '',
       category: item.category ?? '',
+      certification_type: item.certification_type ?? '',
+      qualification_name: item.qualification_name ?? '',
+      credential_number: item.credential_number ?? '',
+      show_credential_number: item.show_credential_number ?? false,
+      training_record_id: item.training_record_id ?? TRAINING_NONE,
       is_visible: item.is_visible !== false,
     })
   }
@@ -96,10 +133,20 @@ export function AdminCertificationsPage() {
                   id: editingId ?? undefined,
                   title: form.title.trim(),
                   issuer: form.issuer.trim(),
-                  issued_at: form.issued_at || null,
+                  issued_at: fromMonthValue(form.issued_at),
+                  expires_at: fromMonthValue(form.expires_at),
                   credential_url: form.credential_url || null,
                   image_url: form.image_url || null,
+                  document_url: form.document_url || null,
                   category: form.category || null,
+                  certification_type: form.certification_type || null,
+                  qualification_name: form.qualification_name.trim() || null,
+                  credential_number: form.credential_number.trim() || null,
+                  show_credential_number: form.show_credential_number,
+                  training_record_id:
+                    form.training_record_id === TRAINING_NONE
+                      ? null
+                      : form.training_record_id,
                   is_visible: form.is_visible,
                   display_order: editingId
                     ? items.find((item) => item.id === editingId)?.display_order ??
@@ -138,14 +185,45 @@ export function AdminCertificationsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cert-date">Issue date</Label>
+              <Label>Certification type</Label>
+              <Select
+                value={form.certification_type || undefined}
+                onValueChange={(value) =>
+                  setForm({ ...form, certification_type: value as CertificationType })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CERTIFICATION_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cert-qualification">Qualification name</Label>
               <Input
-                id="cert-date"
-                type="date"
-                value={form.issued_at}
-                onChange={(e) => setForm({ ...form, issued_at: e.target.value })}
+                id="cert-qualification"
+                value={form.qualification_name}
+                onChange={(e) =>
+                  setForm({ ...form, qualification_name: e.target.value })
+                }
               />
             </div>
+            <MonthYearPicker
+              label="Issue date"
+              value={form.issued_at}
+              onChange={(value) => setForm({ ...form, issued_at: value })}
+            />
+            <MonthYearPicker
+              label="Expiration date"
+              value={form.expires_at}
+              onChange={(value) => setForm({ ...form, expires_at: value })}
+            />
             <div className="space-y-2">
               <Label htmlFor="cert-category">Category</Label>
               <Input
@@ -153,6 +231,37 @@ export function AdminCertificationsPage() {
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cert-number">Credential number</Label>
+              <Input
+                id="cert-number"
+                value={form.credential_number}
+                onChange={(e) =>
+                  setForm({ ...form, credential_number: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Linked training record</Label>
+              <Select
+                value={form.training_record_id}
+                onValueChange={(value) =>
+                  setForm({ ...form, training_record_id: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TRAINING_NONE}>None</SelectItem>
+                  {training.map((record) => (
+                    <SelectItem key={record.id} value={record.id}>
+                      {record.title} — {record.provider}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="cert-url">Credential URL</Label>
@@ -166,11 +275,28 @@ export function AdminCertificationsPage() {
               />
             </div>
           </div>
+          <label className="flex items-center gap-3 text-sm">
+            <Switch
+              checked={form.show_credential_number}
+              onCheckedChange={(checked) =>
+                setForm({ ...form, show_credential_number: checked })
+              }
+            />
+            Show credential number on public site
+          </label>
           <FileUploadField
             label="Certificate image"
             folder="certifications"
+            accept="image/*"
             value={form.image_url}
             onUploaded={(url) => setForm({ ...form, image_url: url })}
+          />
+          <FileUploadField
+            label="Certificate document"
+            folder="certifications"
+            accept=".pdf,image/jpeg,image/png,image/webp"
+            value={form.document_url}
+            onUploaded={(url) => setForm({ ...form, document_url: url })}
           />
           <label className="flex items-center gap-3 text-sm">
             <Switch
@@ -229,8 +355,13 @@ export function AdminCertificationsPage() {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">{item.issuer}</p>
+                  {item.certification_type ? (
+                    <p className="text-xs text-muted-foreground">
+                      {item.certification_type}
+                    </p>
+                  ) : null}
                   <p className="text-xs text-muted-foreground">
-                    {formatDate(item.issued_at, 'MMM d, yyyy') || 'No date'}
+                    {formatDate(item.issued_at, 'MMM yyyy') || 'No date'}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

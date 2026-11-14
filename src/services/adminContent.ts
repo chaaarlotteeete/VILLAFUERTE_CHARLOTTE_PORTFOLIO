@@ -117,11 +117,12 @@ export async function fetchAdminEducation() {
 }
 
 export async function saveEducation(input: TablesInsert<'education'> & { id?: string }) {
-  if (input.id) {
+  const { id, ...payload } = input
+  if (id) {
     const { data, error } = await supabase
       .from('education')
-      .update(input)
-      .eq('id', input.id)
+      .update(payload)
+      .eq('id', id)
       .select('*')
       .single()
     await assertNoError(error)
@@ -129,7 +130,7 @@ export async function saveEducation(input: TablesInsert<'education'> & { id?: st
   }
   const { data, error } = await supabase
     .from('education')
-    .insert(input)
+    .insert(payload)
     .select('*')
     .single()
   await assertNoError(error)
