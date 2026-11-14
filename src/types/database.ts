@@ -723,7 +723,29 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'education_education_level_id_fkey'
+            columns: ['education_level_id']
+            isOneToOne: false
+            referencedRelation: 'education_levels'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'education_track_id_fkey'
+            columns: ['track_id']
+            isOneToOne: false
+            referencedRelation: 'education_tracks'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'education_strand_id_fkey'
+            columns: ['strand_id']
+            isOneToOne: false
+            referencedRelation: 'education_strands'
+            referencedColumns: ['id']
+          },
+        ]
       }
       hobbies: {
         Row: {
