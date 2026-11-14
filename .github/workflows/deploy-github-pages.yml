@@ -1,0 +1,92 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve base path
+        id: base
+        shell: bash
+        run: |
+          if [ -n "${{ vars.VITE_BASE_PATH }}" ]; then
+            BASE="${{ vars.VITE_BASE_PATH }}"
+          else
+            BASE="/${{ github.event.repository.name }}/"
+          fi
+          case "$BASE" in
+            */) ;;
+            *) BASE="${BASE}/" ;;
+          esac
+          case "$BASE" in
+            /*) ;;
+            *) BASE="/${BASE}" ;;
+          esac
+          echo "value=${BASE}" >> "$GITHUB_OUTPUT"
+          echo "Using VITE_BASE_PATH=${BASE}"
+
+      - name: Build
+        env:
+          VITE_SUPABASE_URL_VAR: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY_VAR: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL_SECRET: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY_SECRET: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_BASE_PATH: ${{ steps.base.outputs.value }}
+          VITE_SITE_TITLE: ${{ vars.VITE_SITE_TITLE }}
+          VITE_ADMIN_EMAIL: ${{ vars.VITE_ADMIN_EMAIL }}
+        run: |
+          export VITE_SUPABASE_URL="${VITE_SUPABASE_URL_VAR:-$VITE_SUPABASE_URL_SECRET}"
+          export VITE_SUPABASE_ANON_KEY="${VITE_SUPABASE_ANON_KEY_VAR:-$VITE_SUPABASE_ANON_KEY_SECRET}"
+          export VITE_SITE_TITLE="${VITE_SITE_TITLE:-Portfolio - Villafuerte Charlotte}"
+          export VITE_ADMIN_EMAIL="${VITE_ADMIN_EMAIL:-charlottevillafuerte.w@gmail.com}"
+
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY."
+            echo "Add them under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+          npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
