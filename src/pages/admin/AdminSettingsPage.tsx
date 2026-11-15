@@ -225,9 +225,13 @@ export function AdminSettingsPage() {
 
       <section className="space-y-4 rounded-xl border bg-card p-5">
         <h2 className="text-lg font-semibold">Portfolio branding</h2>
+        <p className="text-sm text-muted-foreground">
+          Browser tab title is the text shown in the browser tab (e.g.
+          &quot;Charlotte T. Villafuerte | Full-Stack Developer&quot;).
+        </p>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="site_title">Site title</Label>
+            <Label htmlFor="site_title">Browser tab title</Label>
             <Input
               id="site_title"
               value={branding.site_title}
@@ -237,6 +241,7 @@ export function AdminSettingsPage() {
                   site_title: event.target.value,
                 }))
               }
+              placeholder="Charlotte T. Villafuerte | Full-Stack Developer"
             />
           </div>
           <div className="space-y-2">
@@ -357,7 +362,7 @@ export function AdminSettingsPage() {
       <section className="space-y-4 rounded-xl border bg-card p-5">
         <h2 className="text-lg font-semibold">SEO metadata</h2>
         <div className="space-y-2">
-          <Label htmlFor="meta_title">Meta title</Label>
+          <Label htmlFor="meta_title">SEO meta title (optional)</Label>
           <Input
             id="meta_title"
             value={seo.meta_title}
@@ -367,6 +372,7 @@ export function AdminSettingsPage() {
                 meta_title: event.target.value,
               }))
             }
+            placeholder="Search engines; leave blank to reuse browser tab title"
           />
         </div>
         <div className="space-y-2">

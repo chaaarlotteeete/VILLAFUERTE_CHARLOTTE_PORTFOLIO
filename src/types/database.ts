@@ -81,6 +81,12 @@ export interface Database {
           profile_image_url: string | null
           email: string | null
           location: string | null
+          birthdate: string | null
+          gender: string | null
+          religion: string | null
+          birthplace: string | null
+          nationality: string | null
+          civil_status: string | null
           updated_at: string
           created_at: string
         }
@@ -96,6 +102,12 @@ export interface Database {
           profile_image_url?: string | null
           email?: string | null
           location?: string | null
+          birthdate?: string | null
+          gender?: string | null
+          religion?: string | null
+          birthplace?: string | null
+          nationality?: string | null
+          civil_status?: string | null
           updated_at?: string
           created_at?: string
         }
@@ -111,6 +123,12 @@ export interface Database {
           profile_image_url?: string | null
           email?: string | null
           location?: string | null
+          birthdate?: string | null
+          gender?: string | null
+          religion?: string | null
+          birthplace?: string | null
+          nationality?: string | null
+          civil_status?: string | null
           updated_at?: string
           created_at?: string
         }
@@ -130,6 +148,8 @@ export interface Database {
           status: ProjectStatus
           start_date: string | null
           end_date: string | null
+          start_date_precision: DatePrecision
+          end_date_precision: DatePrecision
           is_published: boolean
           is_featured: boolean
           display_order: number
@@ -154,6 +174,8 @@ export interface Database {
           status?: ProjectStatus
           start_date?: string | null
           end_date?: string | null
+          start_date_precision?: DatePrecision
+          end_date_precision?: DatePrecision
           is_published?: boolean
           is_featured?: boolean
           display_order?: number
@@ -178,6 +200,8 @@ export interface Database {
           status?: ProjectStatus
           start_date?: string | null
           end_date?: string | null
+          start_date_precision?: DatePrecision
+          end_date_precision?: DatePrecision
           is_published?: boolean
           is_featured?: boolean
           display_order?: number
@@ -298,6 +322,60 @@ export interface Database {
           category?: string | null
           icon?: string | null
           display_order?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      project_field_content_versions: {
+        Row: {
+          id: string
+          project_id: string | null
+          draft_key: string | null
+          field_name: string
+          content: string
+          version_type: 'original' | 'ai_generated' | 'manual_edit' | 'pdf_import'
+          ai_action:
+            | 'rephrase'
+            | 'summarize'
+            | 'improve'
+            | 'organize'
+            | 'pdf_import'
+            | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id?: string | null
+          draft_key?: string | null
+          field_name: string
+          content: string
+          version_type: 'original' | 'ai_generated' | 'manual_edit' | 'pdf_import'
+          ai_action?:
+            | 'rephrase'
+            | 'summarize'
+            | 'improve'
+            | 'organize'
+            | 'pdf_import'
+            | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string | null
+          draft_key?: string | null
+          field_name?: string
+          content?: string
+          version_type?: 'original' | 'ai_generated' | 'manual_edit' | 'pdf_import'
+          ai_action?:
+            | 'rephrase'
+            | 'summarize'
+            | 'improve'
+            | 'organize'
+            | 'pdf_import'
+            | null
+          created_by?: string | null
           created_at?: string
         }
         Relationships: []

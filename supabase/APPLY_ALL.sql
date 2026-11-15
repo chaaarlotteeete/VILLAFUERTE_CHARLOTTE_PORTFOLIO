@@ -1,4 +1,4 @@
-﻿-- Combined Phase 3 migration for Supabase SQL Editor
+-- Combined Phase 3 migration for Supabase SQL Editor
 -- Portfolio - Villafuerte Charlotte
 -- Run this entire script once after creating the Auth admin user.
 -- Fixed: is_admin() is created after public.admin_users exists.
@@ -100,6 +100,12 @@ create table if not exists public.profiles (
   profile_image_url text,
   email text,
   location text,
+  birthdate date,
+  gender text,
+  religion text,
+  birthplace text,
+  nationality text,
+  civil_status text,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
@@ -1261,13 +1267,21 @@ values
   ('hero', 'stat_focus_subtext', 'Systems & QA', 'text'),
   ('hero', 'terminal_prompt', 'charlotte@arch-node:~', 'text'),
   ('hero', 'live_chip_label', 'Live Portfolio Data', 'text'),
+  ('hero', 'config_filename', 'developer.config.json', 'text'),
+  ('hero', 'config_key_engineer', 'engineer', 'text'),
+  ('hero', 'config_engineer', '', 'text'),
+  ('hero', 'config_key_status', 'status', 'text'),
+  ('hero', 'config_status', 'Open to Work', 'text'),
+  ('hero', 'config_key_focus', 'focus', 'text'),
+  ('hero', 'config_focus', '', 'text'),
+  ('hero', 'config_key_ready', 'readyForDeployment', 'text'),
+  ('hero', 'config_ready', 'true', 'boolean'),
   -- About
   ('about', 'card_heading', 'Architecting Systems that Scale & Endure', 'text'),
   ('about', 'card_description', '', 'text'),
   ('about', 'vitals_heading', 'Profile Vitals', 'text'),
   ('about', 'show_vitals', 'true', 'boolean'),
   ('about', 'work_model', 'Hybrid / Remote / On-Site', 'text'),
-  ('about', 'experience_column_heading', 'Professional Experience', 'text'),
   -- Experience section column labels live under experience key
   ('experience', 'experience_column_heading', 'Professional Experience', 'text'),
   ('experience', 'education_column_heading', 'Education', 'text'),
@@ -2432,3 +2446,141 @@ set track_id = excluded.track_id, is_visible = true, name = 'Other';
 
 -- END supabase\migrations\20260317000002_education_shs_tracks_strands.sql
 
+
+-- BEGIN supabase\migrations\20260318000000_hero_config_realtime.sql
+
+insert into public.section_content (section_key, content_key, content_value, content_type)
+values
+  ('hero', 'config_filename', 'developer.config.json', 'text'),
+  ('hero', 'config_key_engineer', 'engineer', 'text'),
+  ('hero', 'config_engineer', '', 'text'),
+  ('hero', 'config_key_status', 'status', 'text'),
+  ('hero', 'config_status', 'Open to Work', 'text'),
+  ('hero', 'config_key_focus', 'focus', 'text'),
+  ('hero', 'config_focus', '', 'text'),
+  ('hero', 'config_key_ready', 'readyForDeployment', 'text'),
+  ('hero', 'config_ready', 'true', 'boolean')
+on conflict (section_key, content_key) do nothing;
+
+do $$
+declare
+  tbl text;
+  tables text[] := array[
+    'awards',
+    'award_categories',
+    'training_records'
+  ];
+begin
+  foreach tbl in array tables loop
+    begin
+      execute format(
+        'alter publication supabase_realtime add table public.%I',
+        tbl
+      );
+    exception
+      when duplicate_object then
+        null;
+      when undefined_object then
+        null;
+    end;
+  end loop;
+end $$;
+
+-- END supabase\migrations\20260318000000_hero_config_realtime.sql
+
+
+-- BEGIN supabase\migrations\20260319000000_profile_personal_details.sql
+
+alter table public.profiles
+  add column if not exists birthdate date,
+  add column if not exists gender text,
+  add column if not exists religion text,
+  add column if not exists birthplace text,
+  add column if not exists nationality text,
+  add column if not exists civil_status text;
+
+-- END supabase\migrations\20260319000000_profile_personal_details.sql
+
+
+-- BEGIN supabase\migrations\20260320000000_project_date_precision.sql
+
+-- Allow project timeline dates to be year-only or month+year.
+-- Stored dates remain PostgreSQL dates (first of month / Jan 1);
+-- precision columns control display and admin round-trip.
+
+alter table public.projects
+  add column if not exists start_date_precision text not null default 'month',
+  add column if not exists end_date_precision text not null default 'month';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'projects_start_date_precision_check'
+  ) then
+    alter table public.projects
+      add constraint projects_start_date_precision_check
+      check (start_date_precision in ('year', 'month'));
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint where conname = 'projects_end_date_precision_check'
+  ) then
+    alter table public.projects
+      add constraint projects_end_date_precision_check
+      check (end_date_precision in ('year', 'month'));
+  end if;
+end $$;
+
+-- END supabase\migrations\20260320000000_project_date_precision.sql
+
+
+-- BEGIN supabase\migrations\20260321000000_project_docs_private_bucket.sql
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'portfolio-project-docs',
+  'portfolio-project-docs',
+  false,
+  10485760,
+  array['application/pdf']
+)
+on conflict (id) do update
+set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Admins can read project docs" on storage.objects;
+create policy "Admins can read project docs"
+on storage.objects
+for select
+to authenticated
+using (bucket_id = 'portfolio-project-docs' and public.is_admin());
+
+drop policy if exists "Admins can upload project docs" on storage.objects;
+create policy "Admins can upload project docs"
+on storage.objects
+for insert
+to authenticated
+with check (bucket_id = 'portfolio-project-docs' and public.is_admin());
+
+drop policy if exists "Admins can update project docs" on storage.objects;
+create policy "Admins can update project docs"
+on storage.objects
+for update
+to authenticated
+using (bucket_id = 'portfolio-project-docs' and public.is_admin())
+with check (bucket_id = 'portfolio-project-docs' and public.is_admin());
+
+drop policy if exists "Admins can delete project docs" on storage.objects;
+create policy "Admins can delete project docs"
+on storage.objects
+for delete
+to authenticated
+using (bucket_id = 'portfolio-project-docs' and public.is_admin());
+
+-- END supabase\migrations\20260321000000_project_docs_private_bucket.sql
+
+-- BEGIN supabase\migrations\20260322000000_project_field_content_versions.sql
+-- (see migration file for full DDL; already applied remotely)
+-- END supabase\migrations\20260322000000_project_field_content_versions.sql

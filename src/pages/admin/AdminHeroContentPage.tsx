@@ -8,7 +8,10 @@ import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
-import { HERO_FIELD_DEFS } from '@/lib/cms-defaults'
+import {
+  HERO_CONFIG_FIELD_DEFS,
+  HERO_LAYOUT_FIELD_DEFS,
+} from '@/lib/cms-defaults'
 import {
   fetchActiveDraft,
   fetchSectionContentMap,
@@ -115,7 +118,7 @@ export function AdminHeroContentPage() {
     <div className="space-y-8">
       <PageHeader
         title="Hero Content"
-        description="Headline, availability, CTAs, and hero metrics copy shown on the homepage."
+        description="Headline, availability, CTAs, hero metrics, and the developer.config card shown on the homepage."
         actions={
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
@@ -147,15 +150,52 @@ export function AdminHeroContentPage() {
       />
 
       <section className="space-y-4 rounded-xl border bg-card p-5">
-        <h2 className="text-lg font-semibold">Hero fields</h2>
+        <h2 className="text-lg font-semibold">developer.config.json</h2>
         <p className="text-sm text-muted-foreground">
-          Profile name, title, and biography are edited under{' '}
+          Edit both the JSON keys and values on the dark code card. Leave line 1
+          or line 3 values blank to fall back to{' '}
+          <Link to="/admin/profile" className="text-primary underline">
+            Profile
+          </Link>{' '}
+          name / specialization. Use Publish now to update the public site.
+        </p>
+        <div className="rounded-lg bg-muted/50 p-3 font-mono text-xs text-muted-foreground">
+          // {values.config_filename?.trim() || 'developer.config.json'}
+          <br />
+          &quot;{values.config_key_engineer?.trim() || 'engineer'}&quot;:
+          &quot;{values.config_engineer?.trim() || 'Profile name'}&quot;,
+          <br />
+          &quot;{values.config_key_status?.trim() || 'status'}&quot;:
+          &quot;{values.config_status?.trim() || 'Open to Work'}&quot;,
+          <br />
+          &quot;{values.config_key_focus?.trim() || 'focus'}&quot;:
+          &quot;{values.config_focus?.trim() || 'Profile specialization'}&quot;,
+          <br />
+          &quot;{values.config_key_ready?.trim() || 'readyForDeployment'}&quot;:{' '}
+          {values.config_ready === 'false' ? 'false' : 'true'}
+        </div>
+        <SectionContentFields
+          fields={HERO_CONFIG_FIELD_DEFS}
+          values={values}
+          onChange={setValues}
+        />
+      </section>
+
+      <section className="space-y-4 rounded-xl border bg-card p-5">
+        <h2 className="text-lg font-semibold">Hero layout & CTAs</h2>
+        <p className="text-sm text-muted-foreground">
+          Headline, availability badge, buttons, stats, and chrome. Profile photo
+          and bio stay under{' '}
           <Link to="/admin/profile" className="text-primary underline">
             Profile
           </Link>
           .
         </p>
-        <SectionContentFields fields={HERO_FIELD_DEFS} values={values} onChange={setValues} />
+        <SectionContentFields
+          fields={HERO_LAYOUT_FIELD_DEFS}
+          values={values}
+          onChange={setValues}
+        />
       </section>
     </div>
   )

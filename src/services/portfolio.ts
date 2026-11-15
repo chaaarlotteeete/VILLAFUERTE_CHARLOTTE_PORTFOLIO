@@ -22,12 +22,16 @@ import { fetchProfile } from '@/services/profile'
 import { fetchPublishedProjects } from '@/services/projects'
 import { fetchPublishedResume } from '@/services/resumes'
 import {
+  fetchBrandingSettings,
   fetchContactSettings,
   fetchCredentialsDisplaySettings,
   fetchHomepageSettings,
+  fetchSeoSettings,
+  type BrandingSettings,
   type ContactSettings,
   type CredentialsDisplaySettings,
   type HomepageSettings,
+  type SeoSettings,
 } from '@/services/settings'
 import { fetchSkills } from '@/services/skills'
 import { fetchSocialLinks } from '@/services/social'
@@ -59,6 +63,8 @@ export interface PortfolioData {
   socialLinks: SocialLink[]
   settings: HomepageSettings
   contactSettings: ContactSettings
+  branding: BrandingSettings
+  seo: SeoSettings
   cms: CmsPortfolioBundle
   sections: Record<string, PageSection>
   content: Record<string, SectionContentMap>
@@ -82,6 +88,8 @@ export async function fetchPortfolioData(): Promise<PortfolioData> {
     profile,
     settings,
     contactSettings,
+    branding,
+    seo,
     resume,
     socialLinks,
     projects,
@@ -98,6 +106,8 @@ export async function fetchPortfolioData(): Promise<PortfolioData> {
     fetchProfile(),
     fetchHomepageSettings(),
     fetchContactSettings(),
+    fetchBrandingSettings(),
+    fetchSeoSettings(),
     fetchPublishedResume(),
     fetchSocialLinks(),
     fetchPublishedProjects(),
@@ -171,6 +181,8 @@ export async function fetchPortfolioData(): Promise<PortfolioData> {
     socialLinks,
     settings: resolvedSettings,
     contactSettings,
+    branding,
+    seo,
     cms,
     sections: cms.sections,
     content: cms.content,

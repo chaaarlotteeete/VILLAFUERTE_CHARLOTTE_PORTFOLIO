@@ -142,6 +142,16 @@ export async function deleteEducation(id: string) {
   await assertNoError(error)
 }
 
+export async function reorderEducation(orderedIds: string[]) {
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase.from('education').update({ display_order: index }).eq('id', id),
+    ),
+  )
+  const failed = results.find((result) => result.error)
+  if (failed?.error) throw new Error(failed.error.message)
+}
+
 export async function fetchAdminCertifications() {
   const { data, error } = await supabase
     .from('certifications')
@@ -177,6 +187,19 @@ export async function saveCertification(
 export async function deleteCertification(id: string) {
   const { error } = await supabase.from('certifications').delete().eq('id', id)
   await assertNoError(error)
+}
+
+export async function reorderCertifications(orderedIds: string[]) {
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase
+        .from('certifications')
+        .update({ display_order: index })
+        .eq('id', id),
+    ),
+  )
+  const failed = results.find((result) => result.error)
+  if (failed?.error) throw new Error(failed.error.message)
 }
 
 export async function fetchAdminResumes() {

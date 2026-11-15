@@ -99,9 +99,9 @@ export function AboutSection({
           </p>
         </div>
 
-        <div className="mb-12 grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
-          <div className="flex flex-col gap-6 lg:col-span-8">
-            <div className="flex flex-col gap-4 rounded-2xl bg-surface-container-lowest p-8 shadow-sm">
+        <div className="mb-12 grid grid-cols-1 items-stretch gap-8 lg:grid-cols-2">
+          <div className="flex h-full flex-col gap-6">
+            <div className="flex h-full flex-col gap-4 rounded-2xl bg-surface-container-lowest p-8 shadow-sm">
               <h3 className="font-display text-xl font-semibold text-on-surface">
                 {cardHeading}
               </h3>
@@ -147,7 +147,7 @@ export function AboutSection({
           </div>
 
           {showVitals ? (
-            <div className="flex flex-col gap-5 rounded-2xl bg-surface-container-lowest p-6 shadow-sm lg:col-span-4">
+            <div className="flex h-full flex-col gap-5 rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
               <div className="flex items-center gap-3 rounded-xl bg-surface-container-low px-4 py-2.5">
                 <MaterialIcon
                   name="contact_page"
@@ -176,6 +176,29 @@ export function AboutSection({
                     label: 'Location',
                     value: profile?.location || 'Metro Manila, Philippines',
                   },
+                  profile?.birthdate
+                    ? {
+                        label: 'Birthdate',
+                        value:
+                          formatDate(profile.birthdate, 'MMM d, yyyy') ||
+                          profile.birthdate,
+                      }
+                    : null,
+                  profile?.birthplace
+                    ? { label: 'Birthplace', value: profile.birthplace }
+                    : null,
+                  profile?.gender
+                    ? { label: 'Gender', value: profile.gender }
+                    : null,
+                  profile?.religion
+                    ? { label: 'Religion', value: profile.religion }
+                    : null,
+                  profile?.nationality
+                    ? { label: 'Nationality', value: profile.nationality }
+                    : null,
+                  profile?.civil_status
+                    ? { label: 'Civil Status', value: profile.civil_status }
+                    : null,
                   {
                     label: 'Core Focus',
                     value: profile?.specialization || 'Full-Stack & Systems',
@@ -185,7 +208,13 @@ export function AboutSection({
                     label: 'Work Model',
                     value: workModel,
                   },
-                ].map((row) => (
+                ]
+                  .filter(
+                    (
+                      row,
+                    ): row is NonNullable<typeof row> => row != null,
+                  )
+                  .map((row) => (
                   <div
                     key={row.label}
                     className="flex items-center justify-between rounded-lg bg-surface-container-low px-3 py-2"

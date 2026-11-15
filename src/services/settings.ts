@@ -22,6 +22,19 @@ export interface ContactSettings {
   support_email: string
 }
 
+export interface BrandingSettings {
+  site_title: string
+  tagline: string
+  logo_url: string
+  favicon_url: string
+}
+
+export interface SeoSettings {
+  meta_title: string
+  meta_description: string
+  og_image_url: string
+}
+
 const defaultHomepage: HomepageSettings = {
   show_featured_projects: true,
   show_highlighted_skills: true,
@@ -37,6 +50,19 @@ const defaultContact: ContactSettings = {
   enable_form: true,
   success_message: 'Thank you. Your message has been sent.',
   support_email: '',
+}
+
+const defaultBranding: BrandingSettings = {
+  site_title: '',
+  tagline: '',
+  logo_url: '',
+  favicon_url: '',
+}
+
+const defaultSeo: SeoSettings = {
+  meta_title: '',
+  meta_description: '',
+  og_image_url: '',
 }
 
 function asObject(value: unknown): Record<string, unknown> | null {
@@ -144,5 +170,45 @@ export async function fetchContactSettings(): Promise<ContactSettings> {
         : defaultContact.success_message,
     support_email:
       typeof value.support_email === 'string' ? value.support_email : '',
+  }
+}
+
+export async function fetchBrandingSettings(): Promise<BrandingSettings> {
+  const { data, error } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', 'branding')
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+
+  const value = asObject(data?.value)
+  if (!value) return defaultBranding
+
+  return {
+    site_title: typeof value.site_title === 'string' ? value.site_title : '',
+    tagline: typeof value.tagline === 'string' ? value.tagline : '',
+    logo_url: typeof value.logo_url === 'string' ? value.logo_url : '',
+    favicon_url: typeof value.favicon_url === 'string' ? value.favicon_url : '',
+  }
+}
+
+export async function fetchSeoSettings(): Promise<SeoSettings> {
+  const { data, error } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', 'seo')
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+
+  const value = asObject(data?.value)
+  if (!value) return defaultSeo
+
+  return {
+    meta_title: typeof value.meta_title === 'string' ? value.meta_title : '',
+    meta_description:
+      typeof value.meta_description === 'string' ? value.meta_description : '',
+    og_image_url: typeof value.og_image_url === 'string' ? value.og_image_url : '',
   }
 }

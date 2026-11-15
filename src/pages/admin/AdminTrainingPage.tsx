@@ -1,9 +1,16 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ConfirmDeleteButton } from '@/components/admin/ConfirmDeleteButton'
 import { FileUploadField } from '@/components/admin/FileUploadField'
 import { MonthYearPicker } from '@/components/admin/MonthYearPicker'
+import { ReorderControls } from '@/components/admin/ReorderControls'
+import {
+  SortableItemShell,
+  SortableList,
+  type SortableHandleProps,
+} from '@/components/admin/SortableList'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
@@ -25,6 +32,7 @@ import { useAsyncData } from '@/hooks/useAsyncData'
 import {
   deleteTraining,
   fetchAdminTraining,
+  reorderTraining,
   saveTraining,
 } from '@/services/adminTraining'
 import type { TrainingRecord, TrainingType } from '@/types/database'
@@ -66,14 +74,42 @@ function compareMonths(a: string, b: string) {
 
 export function AdminTrainingPage() {
   const { data, error, loading, reload } = useAsyncData(fetchAdminTraining)
+  const [orderedItems, setOrderedItems] = useState<TrainingRecord[]>([])
+  const [savingOrder, setSavingOrder] = useState(false)
   const [form, setForm] = useState(empty)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
 
+  useEffect(() => {
+    if (data) {
+      setOrderedItems(
+        [...data].sort((a, b) => a.display_order - b.display_order),
+      )
+    }
+  }, [data])
+
+  const persistOrder = useCallback(
+    async (next: TrainingRecord[], previous: TrainingRecord[]) => {
+      setSavingOrder(true)
+      setOrderedItems(next)
+      try {
+        await reorderTraining(next.map((item) => item.id))
+        toast.success('Order updated')
+        reload()
+      } catch (err) {
+        setOrderedItems(previous)
+        toast.error(err instanceof Error ? err.message : 'Failed to save order')
+      } finally {
+        setSavingOrder(false)
+      }
+    },
+    [reload],
+  )
+
   if (loading) return <LoadingState rows={3} />
   if (error) return <ErrorState message={error} onRetry={reload} />
 
-  const items = data ?? []
+  const items = orderedItems
 
   function reset() {
     setForm(empty)
@@ -98,7 +134,7 @@ export function AdminTrainingPage() {
       training_hours:
         item.training_hours != null ? String(item.training_hours) : '',
       document_url: item.document_url ?? '',
-      is_visible: item.is_visible,
+      is_visible: item.is_visible !== false,
       display_order: String(item.display_order),
     })
   }
@@ -107,7 +143,7 @@ export function AdminTrainingPage() {
     <div className="space-y-8">
       <PageHeader
         title="Training"
-        description="Manage TESDA programs, bootcamps, workshops, and professional development records."
+        description="Manage training programs, TESDA courses, and professional development. Drag to reorder."
         actions={
           <Button
             type="button"
@@ -122,7 +158,7 @@ export function AdminTrainingPage() {
         }
       />
 
-      {showForm || editingId ? (
+      {showForm ? (
         <form
           className="space-y-4 rounded-xl border bg-card p-5"
           onSubmit={(event) => {
@@ -132,56 +168,21 @@ export function AdminTrainingPage() {
                 toast.error('Title and provider are required')
                 return
               }
-
-              const start = fromMonthValue(form.start_date)
-              const completion = form.is_current
-                ? null
-                : fromMonthValue(form.completion_date)
-              const expected = form.is_current
-                ? fromMonthValue(form.expected_completion)
-                : null
-
               if (
-                !form.is_current &&
                 form.start_date &&
                 form.completion_date &&
-                compareMonths(form.start_date, form.completion_date) > 0
+                !form.is_current &&
+                compareMonths(form.completion_date, form.start_date) < 0
               ) {
-                toast.error('Completion date must be on or after start date')
+                toast.error('Completion date cannot be before start date')
                 return
               }
-
-              if (
-                form.is_current &&
-                form.start_date &&
-                form.expected_completion &&
-                compareMonths(form.start_date, form.expected_completion) > 0
-              ) {
-                toast.error('Expected completion must be on or after start date')
-                return
-              }
-
-              const hours = form.training_hours.trim()
-                ? Number(form.training_hours)
-                : null
-              if (hours != null && (!Number.isFinite(hours) || hours < 0)) {
-                toast.error('Training hours must be a valid non-negative number')
-                return
-              }
-
               const order = form.display_order.trim()
                 ? Number(form.display_order)
                 : editingId
                   ? (items.find((item) => item.id === editingId)?.display_order ??
                     items.length)
                   : items.length
-
-              const completion_status = form.is_current
-                ? 'currently_attending'
-                : completion
-                  ? 'completed'
-                  : 'incomplete'
-
               try {
                 await saveTraining({
                   id: editingId ?? undefined,
@@ -191,17 +192,22 @@ export function AdminTrainingPage() {
                   qualification_code: form.qualification_code.trim() || null,
                   description: form.description.trim() || null,
                   location: form.location.trim() || null,
-                  start_date: start,
-                  completion_date: completion,
-                  expected_completion: expected,
+                  start_date: fromMonthValue(form.start_date),
+                  completion_date: form.is_current
+                    ? null
+                    : fromMonthValue(form.completion_date),
+                  expected_completion: form.is_current
+                    ? fromMonthValue(form.expected_completion)
+                    : null,
                   is_current: form.is_current,
-                  training_hours: hours,
-                  completion_status,
-                  document_url: form.document_url || null,
+                  training_hours: form.training_hours.trim()
+                    ? Number(form.training_hours)
+                    : null,
+                  document_url: form.document_url.trim() || null,
                   is_visible: form.is_visible,
                   display_order: Number.isFinite(order) ? order : items.length,
                 })
-                toast.success(editingId ? 'Training updated' : 'Training added')
+                toast.success(editingId ? 'Training updated' : 'Training saved')
                 reset()
                 reload()
               } catch (err) {
@@ -210,24 +216,21 @@ export function AdminTrainingPage() {
             })()
           }}
         >
-          <h2 className="text-lg font-semibold">
-            {editingId ? 'Edit Training' : 'Add Training'}
-          </h2>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Title</Label>
               <Input
-                required
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
+                required
               />
             </div>
             <div className="space-y-2">
               <Label>Provider</Label>
               <Input
-                required
                 value={form.provider}
                 onChange={(e) => setForm({ ...form, provider: e.target.value })}
+                required
               />
             </div>
             <div className="space-y-2">
@@ -259,11 +262,22 @@ export function AdminTrainingPage() {
                 }
               />
             </div>
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
               <Label>Location</Label>
               <Input
                 value={form.location}
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Training hours</Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.training_hours}
+                onChange={(e) =>
+                  setForm({ ...form, training_hours: e.target.value })
+                }
               />
             </div>
             <MonthYearPicker
@@ -271,37 +285,27 @@ export function AdminTrainingPage() {
               value={form.start_date}
               onChange={(value) => setForm({ ...form, start_date: value })}
             />
-            <MonthYearPicker
-              label="Completion date"
-              value={form.completion_date}
-              disabled={form.is_current}
-              onChange={(value) => setForm({ ...form, completion_date: value })}
-            />
-            <MonthYearPicker
-              label="Expected completion"
-              value={form.expected_completion}
-              disabled={!form.is_current}
-              onChange={(value) =>
-                setForm({ ...form, expected_completion: value })
-              }
-            />
-            <div className="space-y-2">
-              <Label>Training hours</Label>
-              <Input
-                type="number"
-                min={0}
-                step={1}
-                value={form.training_hours}
-                onChange={(e) =>
-                  setForm({ ...form, training_hours: e.target.value })
+            {form.is_current ? (
+              <MonthYearPicker
+                label="Expected completion"
+                value={form.expected_completion}
+                onChange={(value) =>
+                  setForm({ ...form, expected_completion: value })
                 }
               />
-            </div>
+            ) : (
+              <MonthYearPicker
+                label="Completion date"
+                value={form.completion_date}
+                onChange={(value) =>
+                  setForm({ ...form, completion_date: value })
+                }
+              />
+            )}
             <div className="space-y-2">
               <Label>Display order</Label>
               <Input
                 type="number"
-                min={0}
                 value={form.display_order}
                 onChange={(e) =>
                   setForm({ ...form, display_order: e.target.value })
@@ -358,54 +362,107 @@ export function AdminTrainingPage() {
       {items.length === 0 ? (
         <EmptyState title="No training records yet" />
       ) : (
-        <div className="space-y-3">
-          {items.map((item) => (
-            <div key={item.id} className="rounded-xl border bg-card p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold">{item.title}</h3>
-                    <Badge variant="outline">{item.training_type}</Badge>
-                    {item.is_current ? <Badge>Current</Badge> : null}
-                    {item.is_visible === false ? (
-                      <Badge variant="secondary">Hidden</Badge>
-                    ) : null}
-                  </div>
-                  <p className="text-sm text-muted-foreground">{item.provider}</p>
-                  {item.qualification_code ? (
-                    <p className="text-xs text-muted-foreground">
-                      {item.qualification_code}
-                    </p>
-                  ) : null}
-                  <p className="text-xs text-muted-foreground">
-                    {formatDateRange(
-                      item.start_date,
-                      item.is_current
-                        ? item.expected_completion
-                        : item.completion_date,
-                      item.is_current,
-                    )}
-                  </p>
-                  {item.description ? (
-                    <p className="mt-2 text-sm">{item.description}</p>
-                  ) : null}
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => startEdit(item)}>
-                    Edit
-                  </Button>
-                  <ConfirmDeleteButton
-                    onConfirm={async () => {
-                      await deleteTraining(item.id)
-                      toast.success('Deleted')
-                      reload()
+        <SortableList
+          items={items}
+          disabled={savingOrder}
+          onReorder={async (reordered) => {
+            const withOrder = reordered.map((item, index) => ({
+              ...item,
+              display_order: index,
+            }))
+            await persistOrder(withOrder, items)
+          }}
+          renderItem={(item, handle: SortableHandleProps) => {
+            const index = items.findIndex((row) => row.id === item.id)
+            return (
+              <SortableItemShell className="p-4">
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="mt-1 touch-none rounded p-1 text-muted-foreground hover:bg-muted"
+                    aria-label="Drag to reorder"
+                    {...(handle.listeners as object)}
+                    {...(handle.attributes as object)}
+                  >
+                    <GripVertical className="h-5 w-5" />
+                  </button>
+                  <ReorderControls
+                    disableUp={index <= 0}
+                    disableDown={index >= items.length - 1}
+                    onMoveUp={() => {
+                      if (index <= 0) return
+                      const next = [...items]
+                      const [removed] = next.splice(index, 1)
+                      next.splice(index - 1, 0, removed)
+                      void persistOrder(
+                        next.map((row, i) => ({ ...row, display_order: i })),
+                        items,
+                      )
+                    }}
+                    onMoveDown={() => {
+                      if (index >= items.length - 1) return
+                      const next = [...items]
+                      const [removed] = next.splice(index, 1)
+                      next.splice(index + 1, 0, removed)
+                      void persistOrder(
+                        next.map((row, i) => ({ ...row, display_order: i })),
+                        items,
+                      )
                     }}
                   />
+                  <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold">{item.title}</h3>
+                        <Badge variant="outline">{item.training_type}</Badge>
+                        {item.is_current ? <Badge>Current</Badge> : null}
+                        {item.is_visible === false ? (
+                          <Badge variant="secondary">Hidden</Badge>
+                        ) : null}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {item.provider}
+                      </p>
+                      {item.qualification_code ? (
+                        <p className="text-xs text-muted-foreground">
+                          {item.qualification_code}
+                        </p>
+                      ) : null}
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateRange(
+                          item.start_date,
+                          item.is_current
+                            ? item.expected_completion
+                            : item.completion_date,
+                          item.is_current,
+                        )}
+                      </p>
+                      {item.description ? (
+                        <p className="mt-2 text-sm">{item.description}</p>
+                      ) : null}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => startEdit(item)}
+                      >
+                        Edit
+                      </Button>
+                      <ConfirmDeleteButton
+                        onConfirm={async () => {
+                          await deleteTraining(item.id)
+                          toast.success('Deleted')
+                          reload()
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              </SortableItemShell>
+            )
+          }}
+        />
       )}
     </div>
   )

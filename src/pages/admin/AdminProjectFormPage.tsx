@@ -3,7 +3,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { AiWritingAssistant } from '@/components/admin/AiWritingAssistant'
 import { FileUploadField } from '@/components/admin/FileUploadField'
+import { MonthYearPicker } from '@/components/admin/MonthYearPicker'
+import { ProjectDocumentImport } from '@/components/admin/ProjectDocumentImport'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -20,7 +23,6 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Textarea } from '@/components/ui/textarea'
 import {
   PROJECT_PLATFORMS,
   PROJECT_STATUSES,
@@ -38,7 +40,16 @@ import type {
   ProjectStatus,
   ProjectType,
 } from '@/types/database'
-import { fromMonthValue, toMonthValue } from '@/utils/date'
+import {
+  compareFlexibleDateValues,
+  fromFlexibleDateValue,
+  toFlexibleDateValue,
+} from '@/utils/date'
+import type {
+  ImportableField,
+  ProjectDocumentImportResult,
+} from '@/types/projectDocumentImport'
+import { saveContentVersion } from '@/services/projectWritingAssist'
 import { slugify } from '@/utils/slug'
 
 interface FeatureDraft {
@@ -136,6 +147,23 @@ export function AdminProjectFormPage() {
   const [technologies, setTechnologies] = useState<
     Array<{ id: string; name: string }>
   >([])
+  const [draftKey] = useState(() => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return crypto.randomUUID()
+    }
+    return `draft-${Date.now()}`
+  })
+
+  const projectContext = useMemo(() => {
+    return [
+      form.title ? `Title: ${form.title}` : null,
+      form.role ? `Role: ${form.role}` : null,
+      form.project_type ? `Type: ${form.project_type}` : null,
+      form.platform ? `Platform: ${form.platform}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  }, [form.title, form.role, form.project_type, form.platform])
 
   useEffect(() => {
     let active = true
@@ -170,8 +198,14 @@ export function AdminProjectFormPage() {
           platform: project.platform,
           role: project.role ?? '',
           status: project.status,
-          start_date: toMonthValue(project.start_date),
-          end_date: toMonthValue(project.end_date),
+          start_date: toFlexibleDateValue(
+            project.start_date,
+            project.start_date_precision,
+          ),
+          end_date: toFlexibleDateValue(
+            project.end_date,
+            project.end_date_precision,
+          ),
           github_url: project.github_url ?? '',
           live_url: project.live_url ?? '',
           docs_url: project.docs_url ?? '',
@@ -228,9 +262,174 @@ export function AdminProjectFormPage() {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
+  const occupiedImportFields = useMemo(() => {
+    const occupied = new Set<ImportableField>()
+    if (form.title.trim()) occupied.add('title')
+    if (form.slug.trim()) occupied.add('slug')
+    if (form.role.trim()) occupied.add('role')
+    if (form.short_description.trim()) occupied.add('short_description')
+    if (form.full_description.trim()) occupied.add('full_description')
+    if (form.objectives.trim()) occupied.add('objectives')
+    if (form.start_date.trim()) occupied.add('start_date')
+    if (form.end_date.trim()) occupied.add('end_date')
+    if (form.github_url.trim()) occupied.add('github_url')
+    if (form.live_url.trim()) occupied.add('live_url')
+    if (form.features.length) occupied.add('features')
+    if (form.contributions.length) occupied.add('contributions')
+    if (form.technologyIds.length) occupied.add('technologies')
+    // Enums always have defaults; treat as occupied only when editing an existing project
+    // or when the user has already changed them from defaults during create.
+    if (isEdit || form.project_type !== 'Individual') occupied.add('project_type')
+    if (isEdit || form.platform !== 'Web') occupied.add('platform')
+    if (isEdit || form.status !== 'Ongoing') occupied.add('status')
+    return occupied
+  }, [form, isEdit])
+
+  function applyExtractedDocument(
+    result: ProjectDocumentImportResult,
+    fields: Set<ImportableField>,
+  ) {
+    const parsed = result.extraction
+    if (
+      (fields.has('slug') && parsed.slug) ||
+      (fields.has('title') && parsed.title && fields.has('slug'))
+    ) {
+      setSlugTouched(true)
+    }
+
+    setForm((current) => {
+      const next = { ...current }
+
+      if (fields.has('title') && parsed.title) {
+        next.title = parsed.title
+        if (fields.has('slug') && parsed.slug) {
+          next.slug = parsed.slug
+        } else if (!slugTouched) {
+          next.slug = slugify(parsed.title)
+        }
+      } else if (fields.has('slug') && parsed.slug) {
+        next.slug = parsed.slug
+      }
+
+      if (fields.has('role') && parsed.role) next.role = parsed.role
+      if (fields.has('short_description') && parsed.short_description) {
+        next.short_description = parsed.short_description
+      }
+      if (fields.has('full_description') && parsed.full_description) {
+        next.full_description = parsed.full_description
+      }
+      if (fields.has('objectives') && parsed.objectives) {
+        next.objectives = parsed.objectives
+      }
+      if (fields.has('project_type') && parsed.project_type) {
+        next.project_type = parsed.project_type
+      }
+      if (fields.has('platform') && parsed.platform) {
+        next.platform = parsed.platform
+      }
+      if (fields.has('status') && parsed.status) next.status = parsed.status
+      if (fields.has('start_date') && parsed.start_date) {
+        next.start_date = parsed.start_date
+      }
+      if (fields.has('end_date') && parsed.end_date) {
+        next.end_date = parsed.end_date
+      }
+      if (fields.has('github_url') && parsed.github_url) {
+        next.github_url = parsed.github_url
+      }
+      if (fields.has('live_url') && parsed.live_url) {
+        next.live_url = parsed.live_url
+      }
+      if (result.publicDocsUrl) next.docs_url = result.publicDocsUrl
+
+      if (fields.has('features') && parsed.features.length) {
+        next.features = parsed.features.map((item) => ({
+          key: crypto.randomUUID(),
+          title: item.title,
+          description: item.description,
+          image_url: '',
+        }))
+      }
+      if (fields.has('contributions') && parsed.contributions.length) {
+        next.contributions = parsed.contributions.map((item) => ({
+          key: crypto.randomUUID(),
+          title: item.title,
+          description: item.description,
+        }))
+      }
+      if (fields.has('technologies') && parsed.technologies.length) {
+        const matchedIds = technologies
+          .filter((tech) =>
+            parsed.technologies.some(
+              (item) =>
+                item.matched_name?.toLowerCase() === tech.name.toLowerCase() ||
+                item.name.toLowerCase() === tech.name.toLowerCase(),
+            ),
+          )
+          .map((tech) => tech.id)
+        if (matchedIds.length) {
+          next.technologyIds = Array.from(new Set(matchedIds))
+        }
+      }
+      return next
+    })
+
+    const versionEntries: Array<{ field: string; content: string }> = []
+    if (fields.has('role') && parsed.role) {
+      versionEntries.push({ field: 'role', content: parsed.role })
+    }
+    if (fields.has('short_description') && parsed.short_description) {
+      versionEntries.push({
+        field: 'short_description',
+        content: parsed.short_description,
+      })
+    }
+    if (fields.has('full_description') && parsed.full_description) {
+      versionEntries.push({
+        field: 'full_description',
+        content: parsed.full_description,
+      })
+    }
+    if (fields.has('objectives') && parsed.objectives) {
+      versionEntries.push({ field: 'objectives', content: parsed.objectives })
+    }
+    void Promise.all(
+      versionEntries.map((entry) =>
+        saveContentVersion({
+          projectId: id ?? null,
+          draftKey,
+          fieldName: entry.field,
+          content: entry.content,
+          versionType: 'pdf_import',
+          aiAction: 'pdf_import',
+        }),
+      ),
+    )
+  }
+
   async function saveProject(options: { publish?: boolean; draft?: boolean } = {}) {
     if (!form.title.trim() || !form.slug.trim()) {
       toast.error('Title and slug are required')
+      return null
+    }
+
+    const startParsed = fromFlexibleDateValue(form.start_date)
+    const endParsed = fromFlexibleDateValue(form.end_date)
+
+    if (form.start_date.trim() && !startParsed.date) {
+      toast.error('Start date must be YYYY or YYYY-MM')
+      return null
+    }
+    if (form.end_date.trim() && !endParsed.date) {
+      toast.error('End date must be YYYY or YYYY-MM')
+      return null
+    }
+    if (
+      form.start_date.trim().length >= 4 &&
+      form.end_date.trim().length >= 4 &&
+      compareFlexibleDateValues(form.start_date, form.end_date) > 0
+    ) {
+      toast.error('End date cannot be before start date')
       return null
     }
 
@@ -254,8 +453,10 @@ export function AdminProjectFormPage() {
           platform: form.platform,
           role: form.role || null,
           status: form.status,
-          start_date: fromMonthValue(form.start_date),
-          end_date: fromMonthValue(form.end_date),
+          start_date: startParsed.date,
+          end_date: endParsed.date,
+          start_date_precision: startParsed.precision ?? 'month',
+          end_date_precision: endParsed.precision ?? 'month',
           github_url: form.github_url || null,
           live_url: form.live_url || null,
           docs_url: form.docs_url || null,
@@ -378,8 +579,14 @@ export function AdminProjectFormPage() {
         </TabsList>
 
         <TabsContent value="basic">
-          <section className="space-y-4 rounded-xl border bg-card p-5">
-            <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-4">
+            <ProjectDocumentImport
+              technologyNames={technologies.map((item) => item.name)}
+              occupiedFields={occupiedImportFields}
+              onApply={applyExtractedDocument}
+            />
+            <section className="space-y-4 rounded-xl border bg-card p-5">
+              <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="title">Project Title</Label>
                 <Input
@@ -405,43 +612,54 @@ export function AdminProjectFormPage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Input
-                  id="role"
+              <div className="space-y-2 md:col-span-2">
+                <AiWritingAssistant
+                  fieldName="role"
+                  label="Role"
                   value={form.role}
-                  onChange={(event) => updateField('role', event.target.value)}
+                  onChange={(value) => updateField('role', value)}
+                  projectId={id}
+                  draftKey={draftKey}
+                  projectContext={projectContext}
+                  placeholder="e.g. Full Stack Developer"
+                  minHeightClassName="min-h-[2.75rem]"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="short_description">Short Description</Label>
-                <Textarea
-                  id="short_description"
+                <AiWritingAssistant
+                  fieldName="short_description"
+                  label="Short Description"
                   value={form.short_description}
-                  onChange={(event) =>
-                    updateField('short_description', event.target.value)
-                  }
+                  onChange={(value) => updateField('short_description', value)}
+                  projectId={id}
+                  draftKey={draftKey}
+                  projectContext={projectContext}
+                  minHeightClassName="min-h-[3.25rem]"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="full_description">Full Description</Label>
-                <Textarea
-                  id="full_description"
-                  className="min-h-[160px]"
+                <AiWritingAssistant
+                  fieldName="full_description"
+                  label="Full Description"
                   value={form.full_description}
-                  onChange={(event) =>
-                    updateField('full_description', event.target.value)
-                  }
+                  onChange={(value) => updateField('full_description', value)}
+                  projectId={id}
+                  draftKey={draftKey}
+                  projectContext={projectContext}
+                  minHeightClassName="min-h-[4.5rem]"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="objectives">Objectives</Label>
-                <Textarea
-                  id="objectives"
+                <AiWritingAssistant
+                  fieldName="objectives"
+                  label="Objectives"
                   value={form.objectives}
-                  onChange={(event) =>
-                    updateField('objectives', event.target.value)
-                  }
+                  onChange={(value) => updateField('objectives', value)}
+                  projectId={id}
+                  draftKey={draftKey}
+                  projectContext={projectContext}
+                  placeholder="Paste or type objectives freely — use Organize or Summarize to turn them into bullets"
+                  minHeightClassName="min-h-[4.5rem]"
                 />
               </div>
               <div className="space-y-2">
@@ -504,32 +722,27 @@ export function AdminProjectFormPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 md:col-span-2">
                 <Label>Timeline</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    type="month"
+                <div className="grid gap-4 md:grid-cols-2">
+                  <MonthYearPicker
+                    label="Start"
                     value={form.start_date}
-                    onChange={(event) =>
-                      updateField('start_date', event.target.value)
-                    }
-                    aria-label="Start month and year"
+                    onChange={(value) => updateField('start_date', value)}
+                    allowYearOnly
                   />
-                  <Input
-                    type="month"
+                  <MonthYearPicker
+                    label="End"
                     value={form.end_date}
-                    onChange={(event) =>
-                      updateField('end_date', event.target.value)
-                    }
-                    aria-label="End month and year"
+                    onChange={(value) => updateField('end_date', value)}
+                    allowYearOnly
+                    helperText="Optional. Leave blank if ongoing."
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Month and year only.
-                </p>
               </div>
             </div>
           </section>
+          </div>
         </TabsContent>
 
         <TabsContent value="features">
@@ -586,23 +799,37 @@ export function AdminProjectFormPage() {
                     <ArrowDown />
                   </Button>
                 </div>
-                <Input
-                  placeholder="Feature title"
+                <AiWritingAssistant
+                  fieldName="feature_title"
+                  versionFieldName={`feature:${feature.key}:title`}
+                  label="Feature title"
                   value={feature.title}
-                  onChange={(event) => {
+                  onChange={(value) => {
                     const next = [...form.features]
-                    next[index] = { ...feature, title: event.target.value }
+                    next[index] = { ...feature, title: value }
                     updateField('features', next)
                   }}
+                  projectId={id}
+                  draftKey={draftKey}
+                  projectContext={projectContext}
+                  placeholder="Feature title"
+                  minHeightClassName="min-h-[2.5rem]"
                 />
-                <Textarea
-                  placeholder="Feature description"
+                <AiWritingAssistant
+                  fieldName="feature_description"
+                  versionFieldName={`feature:${feature.key}:description`}
+                  label="Feature description"
                   value={feature.description}
-                  onChange={(event) => {
+                  onChange={(value) => {
                     const next = [...form.features]
-                    next[index] = { ...feature, description: event.target.value }
+                    next[index] = { ...feature, description: value }
                     updateField('features', next)
                   }}
+                  projectId={id}
+                  draftKey={draftKey}
+                  projectContext={projectContext}
+                  placeholder="Feature description"
+                  minHeightClassName="min-h-[3.25rem]"
                 />
                 <FileUploadField
                   label="Feature screenshot"
@@ -684,23 +911,37 @@ export function AdminProjectFormPage() {
                     <ArrowDown />
                   </Button>
                 </div>
-                <Input
-                  placeholder="Contribution title"
+                <AiWritingAssistant
+                  fieldName="contribution_title"
+                  versionFieldName={`contribution:${item.key}:title`}
+                  label="Contribution title"
                   value={item.title}
-                  onChange={(event) => {
+                  onChange={(value) => {
                     const next = [...form.contributions]
-                    next[index] = { ...item, title: event.target.value }
+                    next[index] = { ...item, title: value }
                     updateField('contributions', next)
                   }}
+                  projectId={id}
+                  draftKey={draftKey}
+                  projectContext={projectContext}
+                  placeholder="Contribution title"
+                  minHeightClassName="min-h-[2.5rem]"
                 />
-                <Textarea
-                  placeholder="Contribution details"
+                <AiWritingAssistant
+                  fieldName="contribution_description"
+                  versionFieldName={`contribution:${item.key}:description`}
+                  label="Contribution details"
                   value={item.description}
-                  onChange={(event) => {
+                  onChange={(value) => {
                     const next = [...form.contributions]
-                    next[index] = { ...item, description: event.target.value }
+                    next[index] = { ...item, description: value }
                     updateField('contributions', next)
                   }}
+                  projectId={id}
+                  draftKey={draftKey}
+                  projectContext={projectContext}
+                  placeholder="Contribution details"
+                  minHeightClassName="min-h-[3.25rem]"
                 />
                 <Button
                   type="button"

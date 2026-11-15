@@ -53,8 +53,13 @@ export function ProjectCard({ project }: ProjectCardProps) {
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           {project.role ? <p>Role: {project.role}</p> : null}
           <p>
-            {formatDateRange(project.start_date, project.end_date) ??
-              'Timeline unavailable'}
+            {formatDateRange(
+              project.start_date,
+              project.end_date,
+              project.status === 'Ongoing',
+              project.start_date_precision,
+              project.end_date_precision,
+            ) ?? 'Timeline unavailable'}
           </p>
           {technologies.length > 0 ? (
             <div className="flex flex-wrap gap-2">

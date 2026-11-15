@@ -1,11 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ConfirmDeleteButton } from '@/components/admin/ConfirmDeleteButton'
 import { FileUploadField } from '@/components/admin/FileUploadField'
 import { MonthYearPicker } from '@/components/admin/MonthYearPicker'
+import { ReorderControls } from '@/components/admin/ReorderControls'
 import { SearchableCombobox } from '@/components/admin/SearchableCombobox'
+import {
+  SortableItemShell,
+  SortableList,
+  type SortableHandleProps,
+} from '@/components/admin/SortableList'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
@@ -33,6 +40,7 @@ import {
 import {
   deleteEducation,
   fetchAdminEducation,
+  reorderEducation,
   saveEducation,
 } from '@/services/adminContent'
 import {
@@ -255,10 +263,38 @@ export function AdminEducationPage() {
   const [degreeOptions, setDegreeOptions] = useState<DegreeOption[]>([])
   const [awards, setAwards] = useState<Award[]>([])
   const [catalogsLoading, setCatalogsLoading] = useState(true)
+  const [orderedItems, setOrderedItems] = useState<Education[]>([])
+  const [savingOrder, setSavingOrder] = useState(false)
 
   const [form, setForm] = useState<EducationFormState>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+
+  useEffect(() => {
+    if (data) {
+      setOrderedItems(
+        [...data].sort((a, b) => a.display_order - b.display_order),
+      )
+    }
+  }, [data])
+
+  const persistOrder = useCallback(
+    async (next: Education[], previous: Education[]) => {
+      setSavingOrder(true)
+      setOrderedItems(next)
+      try {
+        await reorderEducation(next.map((item) => item.id))
+        toast.success('Order updated')
+        reload()
+      } catch (err) {
+        setOrderedItems(previous)
+        toast.error(err instanceof Error ? err.message : 'Failed to save order')
+      } finally {
+        setSavingOrder(false)
+      }
+    },
+    [reload],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -438,13 +474,13 @@ export function AdminEducationPage() {
   if (loading) return <LoadingState rows={3} />
   if (error) return <ErrorState message={error} onRetry={reload} />
 
-  const items = data ?? []
+  const items = orderedItems
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Education"
-        description="Manage educational institutions, degrees, tracks, and linked awards."
+        description="Manage educational institutions, degrees, tracks, and linked awards. Drag to reorder."
         actions={
           <Button
             type="button"
@@ -1217,70 +1253,119 @@ export function AdminEducationPage() {
           description="Add schools, degrees, and academic timelines."
         />
       ) : (
-        <div className="space-y-3">
-          {items.map((item) => {
+        <SortableList
+          items={items}
+          disabled={savingOrder}
+          onReorder={async (reordered) => {
+            const withOrder = reordered.map((item, index) => ({
+              ...item,
+              display_order: index,
+            }))
+            await persistOrder(withOrder, items)
+          }}
+          renderItem={(item, handle: SortableHandleProps) => {
+            const index = items.findIndex((row) => row.id === item.id)
             const studying =
               item.is_current || item.status === 'currently_studying'
             const levelName =
               levels.find((level) => level.id === item.education_level_id)
                 ?.name || item.custom_education_level
             return (
-              <div key={item.id} className="rounded-xl border bg-card p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold">{item.institution}</h3>
-                      <Badge variant="outline">{statusLabel(item.status)}</Badge>
-                      {studying ? <Badge>Current</Badge> : null}
-                      {!item.is_visible ? (
-                        <Badge variant="secondary">Hidden</Badge>
-                      ) : (
-                        <Badge variant="success">Visible</Badge>
-                      )}
-                    </div>
-                    {levelName ? (
-                      <p className="text-xs text-muted-foreground">{levelName}</p>
-                    ) : null}
-                    <p className="text-sm font-medium">{item.degree}</p>
-                    {item.specialization ? (
-                      <p className="text-sm text-muted-foreground">
-                        {item.specialization}
+              <SortableItemShell className="p-4">
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="mt-1 touch-none rounded p-1 text-muted-foreground hover:bg-muted"
+                    aria-label="Drag to reorder"
+                    {...(handle.listeners as object)}
+                    {...(handle.attributes as object)}
+                  >
+                    <GripVertical className="h-5 w-5" />
+                  </button>
+                  <ReorderControls
+                    disableUp={index <= 0}
+                    disableDown={index >= items.length - 1}
+                    onMoveUp={() => {
+                      if (index <= 0) return
+                      const next = [...items]
+                      const [removed] = next.splice(index, 1)
+                      next.splice(index - 1, 0, removed)
+                      void persistOrder(
+                        next.map((row, i) => ({ ...row, display_order: i })),
+                        items,
+                      )
+                    }}
+                    onMoveDown={() => {
+                      if (index >= items.length - 1) return
+                      const next = [...items]
+                      const [removed] = next.splice(index, 1)
+                      next.splice(index + 1, 0, removed)
+                      void persistOrder(
+                        next.map((row, i) => ({ ...row, display_order: i })),
+                        items,
+                      )
+                    }}
+                  />
+                  <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold">{item.institution}</h3>
+                        <Badge variant="outline">
+                          {statusLabel(item.status)}
+                        </Badge>
+                        {studying ? <Badge>Current</Badge> : null}
+                        {!item.is_visible ? (
+                          <Badge variant="secondary">Hidden</Badge>
+                        ) : (
+                          <Badge variant="success">Visible</Badge>
+                        )}
+                      </div>
+                      {levelName ? (
+                        <p className="text-xs text-muted-foreground">
+                          {levelName}
+                        </p>
+                      ) : null}
+                      <p className="text-sm font-medium">{item.degree}</p>
+                      {item.specialization ? (
+                        <p className="text-sm text-muted-foreground">
+                          {item.specialization}
+                        </p>
+                      ) : null}
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateRange(
+                          item.start_date,
+                          item.end_date,
+                          studying,
+                          item.start_date_precision,
+                          item.end_date_precision,
+                        )}
                       </p>
-                    ) : null}
-                    <p className="text-xs text-muted-foreground">
-                      {formatDateRange(
-                        item.start_date,
-                        item.end_date,
-                        studying,
-                        item.start_date_precision,
-                        item.end_date_precision,
-                      )}
-                    </p>
-                    {item.description ? (
-                      <p className="mt-2 text-sm">{item.description}</p>
-                    ) : null}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void openEdit(item)}
-                    >
-                      Edit
-                    </Button>
-                    <ConfirmDeleteButton
-                      onConfirm={async () => {
-                        await deleteEducation(item.id)
-                        toast.success('Deleted')
-                        reload()
-                      }}
-                    />
+                      {item.description ? (
+                        <p className="mt-2 text-sm">{item.description}</p>
+                      ) : null}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void openEdit(item)}
+                      >
+                        Edit
+                      </Button>
+                      <ConfirmDeleteButton
+                        onConfirm={async () => {
+                          await deleteEducation(item.id)
+                          toast.success('Deleted')
+                          reload()
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              </SortableItemShell>
             )
-          })}
-        </div>
+          }}
+        />
       )}
     </div>
   )

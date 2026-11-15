@@ -77,7 +77,10 @@ After pulling CMS updates, run new SQL in the Supabase SQL Editor (additive; doe
 2. `supabase/migrations/20260317000000_education_training_hobbies_awards.sql` — education catalogs, training, awards, hobby options, certification TESDA fields
 3. `supabase/migrations/20260317000001_education_date_precision.sql` — education year-only date precision
 4. `supabase/migrations/20260317000002_education_shs_tracks_strands.sql` — SHS track/strand catalog cleanup
-5. Or re-run the matching blocks at the end of `supabase/APPLY_ALL.sql`
+5. `supabase/migrations/20260321000000_project_docs_private_bucket.sql` — private PDF import bucket
+6. Or re-run the matching blocks at the end of `supabase/APPLY_ALL.sql`
+
+For AI PDF project import secrets and Edge Function setup, see `docs/PDF_IMPORT.md`.
 
 Confirm tables/columns exist as needed: `education_levels`, `degree_options`, `training_records`, `awards`, `hobby_categories`, `hobby_options`, and new columns on `education` / `certifications` / `hobbies`.
 

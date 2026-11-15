@@ -43,21 +43,15 @@ export async function deleteTraining(id: string) {
   await assertNoError(error)
 }
 
-export async function reorderTraining(items: TrainingRecord[]) {
-  const previous = items.map((item) => ({ ...item }))
-  try {
-    await Promise.all(
-      items.map((item, index) =>
-        supabase
-          .from('training_records')
-          .update({ display_order: index })
-          .eq('id', item.id),
-      ),
-    )
-  } catch (error) {
-    throw error instanceof Error
-      ? error
-      : new Error('Failed to save training order')
-  }
-  return previous
+export async function reorderTraining(orderedIds: string[]) {
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase
+        .from('training_records')
+        .update({ display_order: index })
+        .eq('id', id),
+    ),
+  )
+  const failed = results.find((result) => result.error)
+  if (failed?.error) throw new Error(failed.error.message)
 }

@@ -6,29 +6,7 @@ import {
   type PortfolioData,
 } from '@/services/portfolio'
 
-const REALTIME_TABLES = [
-  'profiles',
-  'projects',
-  'project_technologies',
-  'technologies',
-  'skills',
-  'experiences',
-  'education',
-  'hobbies',
-  'hobby_media',
-  'certifications',
-  'awards',
-  'award_categories',
-  'training_records',
-  'resumes',
-  'social_links',
-  'site_settings',
-  'page_sections',
-  'section_content',
-  'specialization_cards',
-  'navigation_items',
-  'skill_categories',
-] as const
+const POLL_INTERVAL_MS = 45_000
 
 export function useRealtimePortfolio() {
   const [data, setData] = useState<PortfolioData | null>(null)
@@ -37,6 +15,7 @@ export function useRealtimePortfolio() {
   const [live, setLive] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const silentRef = useRef(false)
+  const mountedRef = useRef(true)
 
   const load = useCallback(async (silent = false) => {
     silentRef.current = silent
@@ -47,13 +26,15 @@ export function useRealtimePortfolio() {
 
     try {
       const result = await fetchPortfolioData()
+      if (!mountedRef.current) return
       setData(result)
       setError(null)
     } catch (err) {
+      if (!mountedRef.current) return
       setError(err instanceof Error ? err.message : 'Failed to load portfolio')
       if (!silent) setData(null)
     } finally {
-      if (!silentRef.current) setLoading(false)
+      if (mountedRef.current && !silentRef.current) setLoading(false)
     }
   }, [])
 
@@ -65,26 +46,44 @@ export function useRealtimePortfolio() {
   }, [load])
 
   useEffect(() => {
+    mountedRef.current = true
     void load(false)
+    return () => {
+      mountedRef.current = false
+    }
   }, [load])
 
   useEffect(() => {
-    const channel = supabase.channel('public-portfolio-realtime')
-
-    for (const table of REALTIME_TABLES) {
-      channel.on(
+    const channel = supabase
+      .channel('public-portfolio-realtime')
+      .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table },
+        { event: '*', schema: 'public' },
         () => scheduleReload(),
       )
-    }
 
     channel.subscribe((status) => {
+      if (!mountedRef.current) return
       setLive(status === 'SUBSCRIBED')
     })
 
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') scheduleReload()
+    }
+    const onFocus = () => scheduleReload()
+
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onFocus)
+
+    const pollId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') scheduleReload()
+    }, POLL_INTERVAL_MS)
+
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onFocus)
+      window.clearInterval(pollId)
       void supabase.removeChannel(channel)
     }
   }, [scheduleReload])

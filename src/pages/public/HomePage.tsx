@@ -17,10 +17,20 @@ import { ProjectsArchiveSection } from '@/components/public/ProjectsArchiveSecti
 import { SkillsSection } from '@/components/public/SkillsSection'
 import { useRealtimePortfolio } from '@/hooks/useRealtimePortfolio'
 import { ADMIN_EMAIL } from '@/lib/constants'
+import { applyDocumentMeta } from '@/utils/document-meta'
 
 export function HomePage() {
   const { data, error, loading, live, reload } = useRealtimePortfolio()
   const location = useLocation()
+
+  useEffect(() => {
+    if (!data) return
+    applyDocumentMeta({
+      branding: data.branding,
+      seo: data.seo,
+      profile: data.profile,
+    })
+  }, [data])
 
   useEffect(() => {
     if (loading || !location.hash) return

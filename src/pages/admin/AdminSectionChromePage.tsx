@@ -8,10 +8,13 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import {
   HOMEPAGE_SECTION_LABELS,
   PAGE_SECTION_DEFAULTS,
+  parseContentBoolean,
+  serializeContentBoolean,
 } from '@/lib/cms-defaults'
 import {
   fetchPageSectionByKey,
@@ -42,6 +45,8 @@ export function AdminSectionChromePage() {
   )
   const [educationHeading, setEducationHeading] = useState('Education')
   const [highlightsHeading, setHighlightsHeading] = useState('Highlights')
+  const [showHobbiesWhenEmpty, setShowHobbiesWhenEmpty] = useState(false)
+  const [hobbiesEmptyMessage, setHobbiesEmptyMessage] = useState('')
 
   const label = HOMEPAGE_SECTION_LABELS[sectionKey] || sectionKey
   const allowed = (EDITABLE_KEYS as readonly string[]).includes(sectionKey)
@@ -68,6 +73,11 @@ export function AdminSectionChromePage() {
         )
         setEducationHeading(content.education_column_heading || 'Education')
         setHighlightsHeading(content.highlights_heading || 'Highlights')
+      }
+      if (sectionKey === 'hobbies') {
+        const content = await fetchSectionContentMap('hobbies')
+        setShowHobbiesWhenEmpty(parseContentBoolean(content.show_when_empty))
+        setHobbiesEmptyMessage(content.empty_state_message || '')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load section')
@@ -98,6 +108,12 @@ export function AdminSectionChromePage() {
           experience_column_heading: experienceHeading.trim(),
           education_column_heading: educationHeading.trim(),
           highlights_heading: highlightsHeading.trim(),
+        })
+      }
+      if (sectionKey === 'hobbies') {
+        await upsertSectionContentMap('hobbies', {
+          show_when_empty: serializeContentBoolean(showHobbiesWhenEmpty),
+          empty_state_message: hobbiesEmptyMessage.trim(),
         })
       }
       toast.success(`${label} section published`)
@@ -173,6 +189,27 @@ export function AdminSectionChromePage() {
                 id="highlights-heading"
                 value={highlightsHeading}
                 onChange={(event) => setHighlightsHeading(event.target.value)}
+              />
+            </div>
+          </>
+        ) : null}
+        {sectionKey === 'hobbies' ? (
+          <>
+            <label className="flex items-center gap-3 text-sm">
+              <Switch
+                checked={showHobbiesWhenEmpty}
+                onCheckedChange={setShowHobbiesWhenEmpty}
+              />
+              Show section when no hobbies are published
+            </label>
+            <div className="space-y-2">
+              <Label htmlFor="hobbies-empty">Empty state message</Label>
+              <Textarea
+                id="hobbies-empty"
+                rows={3}
+                value={hobbiesEmptyMessage}
+                onChange={(event) => setHobbiesEmptyMessage(event.target.value)}
+                placeholder="Optional message when the hobbies list is empty"
               />
             </div>
           </>

@@ -27,18 +27,22 @@ export function SectionContentFields({
       {fields.map((field) => {
         if (field.type === 'boolean') {
           return (
-            <label
-              key={field.key}
-              className="flex items-center gap-3 text-sm md:col-span-2"
-            >
-              <Switch
-                checked={parseContentBoolean(values[field.key])}
-                onCheckedChange={(checked) =>
-                  setValue(field.key, serializeContentBoolean(checked))
-                }
-              />
-              {field.label}
-            </label>
+            <div key={field.key} className="space-y-1 md:col-span-2">
+              <label className="flex items-center gap-3 text-sm">
+                <Switch
+                  checked={parseContentBoolean(values[field.key])}
+                  onCheckedChange={(checked) =>
+                    setValue(field.key, serializeContentBoolean(checked))
+                  }
+                />
+                {field.label}
+              </label>
+              {field.description ? (
+                <p className="pl-12 text-xs text-muted-foreground">
+                  {field.description}
+                </p>
+              ) : null}
+            </div>
           )
         }
 
@@ -118,6 +122,9 @@ export function SectionContentFields({
                 placeholder={field.placeholder}
               />
             )}
+            {field.description ? (
+              <p className="text-xs text-muted-foreground">{field.description}</p>
+            ) : null}
           </div>
         )
       })}

@@ -50,22 +50,102 @@ export const HERO_CONTENT_DEFAULTS: SectionContentDefault[] = [
   { content_key: 'stat_focus_subtext', content_value: 'Systems & QA', content_type: 'text' },
   { content_key: 'terminal_prompt', content_value: 'charlotte@arch-node:~', content_type: 'text' },
   { content_key: 'live_chip_label', content_value: 'Live Portfolio Data', content_type: 'text' },
+  { content_key: 'config_filename', content_value: 'developer.config.json', content_type: 'text' },
+  { content_key: 'config_key_engineer', content_value: 'engineer', content_type: 'text' },
+  { content_key: 'config_engineer', content_value: '', content_type: 'text' },
+  { content_key: 'config_key_status', content_value: 'status', content_type: 'text' },
+  { content_key: 'config_status', content_value: 'Open to Work', content_type: 'text' },
+  { content_key: 'config_key_focus', content_value: 'focus', content_type: 'text' },
+  { content_key: 'config_focus', content_value: '', content_type: 'text' },
+  { content_key: 'config_key_ready', content_value: 'readyForDeployment', content_type: 'text' },
+  { content_key: 'config_ready', content_value: 'true', content_type: 'boolean' },
 ]
 
-export const HERO_FIELD_DEFS = defs(HERO_CONTENT_DEFAULTS, {
-  eyebrow: 'Availability eyebrow',
-  headline: 'Main headline',
-  headline_accent: 'Headline accent phrase',
-  show_availability: 'Show availability badge',
-  primary_cta_label: 'Primary CTA label',
-  primary_cta_href: 'Primary CTA link',
-  secondary_cta_label: 'Secondary CTA label',
-  secondary_cta_href: 'Secondary CTA link',
-  show_github: 'Show GitHub button',
-  show_linkedin: 'Show LinkedIn button',
-  terminal_prompt: 'Terminal prompt text',
-  live_chip_label: 'Live data chip label',
-})
+/** Hero fields excluding the developer.config card block. */
+export const HERO_LAYOUT_FIELD_DEFS = defs(
+  HERO_CONTENT_DEFAULTS.filter((row) => !row.content_key.startsWith('config_')),
+  {
+    eyebrow: 'Availability eyebrow',
+    headline: 'Main headline',
+    headline_accent: 'Headline accent phrase',
+    show_availability: 'Show availability badge',
+    primary_cta_label: 'Primary CTA label',
+    primary_cta_href: 'Primary CTA link',
+    secondary_cta_label: 'Secondary CTA label',
+    secondary_cta_href: 'Secondary CTA link',
+    show_github: 'Show GitHub button',
+    show_linkedin: 'Show LinkedIn button',
+    stat_specialization_label: 'Specialization stat label',
+    stat_projects_label: 'Projects stat label',
+    stat_projects_subtext: 'Projects stat subtext',
+    stat_focus_label: 'Focus stat label',
+    stat_focus_value: 'Focus stat value',
+    stat_focus_subtext: 'Focus stat subtext',
+    terminal_prompt: 'Terminal / window title',
+    live_chip_label: 'Live data chip label',
+  },
+)
+
+export const HERO_CONFIG_FIELD_DEFS: ContentFieldDef[] = [
+  {
+    key: 'config_filename',
+    label: 'Filename comment',
+    type: 'text',
+    placeholder: 'developer.config.json',
+  },
+  {
+    key: 'config_key_engineer',
+    label: 'Line 1 key',
+    type: 'text',
+    placeholder: 'engineer',
+  },
+  {
+    key: 'config_engineer',
+    label: 'Line 1 value',
+    type: 'text',
+    placeholder: 'Leave blank to use Profile full name',
+  },
+  {
+    key: 'config_key_status',
+    label: 'Line 2 key',
+    type: 'text',
+    placeholder: 'status',
+  },
+  {
+    key: 'config_status',
+    label: 'Line 2 value',
+    type: 'text',
+    placeholder: 'Open to Work',
+  },
+  {
+    key: 'config_key_focus',
+    label: 'Line 3 key',
+    type: 'text',
+    placeholder: 'focus',
+  },
+  {
+    key: 'config_focus',
+    label: 'Line 3 value',
+    type: 'text',
+    placeholder: 'Leave blank to use Profile specialization',
+  },
+  {
+    key: 'config_key_ready',
+    label: 'Line 4 key',
+    type: 'text',
+    placeholder: 'readyForDeployment',
+  },
+  {
+    key: 'config_ready',
+    label: 'Line 4 boolean value',
+    type: 'boolean',
+  },
+]
+
+export const HERO_FIELD_DEFS = [
+  ...HERO_LAYOUT_FIELD_DEFS,
+  ...HERO_CONFIG_FIELD_DEFS,
+]
 
 export const ABOUT_CONTENT_DEFAULTS: SectionContentDefault[] = [
   { content_key: 'card_heading', content_value: 'Architecting Systems that Scale & Endure', content_type: 'text' },
@@ -73,7 +153,6 @@ export const ABOUT_CONTENT_DEFAULTS: SectionContentDefault[] = [
   { content_key: 'vitals_heading', content_value: 'Profile Vitals', content_type: 'text' },
   { content_key: 'show_vitals', content_value: 'true', content_type: 'boolean' },
   { content_key: 'work_model', content_value: 'Hybrid / Remote / On-Site', content_type: 'text' },
-  { content_key: 'experience_column_heading', content_value: 'Professional Experience', content_type: 'text' },
 ]
 
 export const ABOUT_FIELD_DEFS = defs(ABOUT_CONTENT_DEFAULTS, {
@@ -84,6 +163,20 @@ export const ABOUT_FIELD_DEFS = defs(ABOUT_CONTENT_DEFAULTS, {
   work_model: 'Work model label',
 })
 
+export const EXPERIENCE_CONTENT_DEFAULTS: SectionContentDefault[] = [
+  {
+    content_key: 'experience_column_heading',
+    content_value: 'Professional Experience',
+    content_type: 'text',
+  },
+  { content_key: 'education_column_heading', content_value: 'Education', content_type: 'text' },
+  { content_key: 'highlights_heading', content_value: 'Highlights', content_type: 'text' },
+]
+
+export const HOBBIES_CONTENT_DEFAULTS: SectionContentDefault[] = [
+  { content_key: 'show_when_empty', content_value: 'false', content_type: 'boolean' },
+  { content_key: 'empty_state_message', content_value: '', content_type: 'text' },
+]
 export const CONTACT_CONTENT_DEFAULTS: SectionContentDefault[] = [
   { content_key: 'form_heading', content_value: 'Send a Message', content_type: 'text' },
   { content_key: 'submit_label', content_value: 'Send Message', content_type: 'text' },
@@ -322,6 +415,10 @@ export function defaultsForSection(sectionKey: string): SectionContentDefault[] 
       return HERO_CONTENT_DEFAULTS
     case 'about':
       return ABOUT_CONTENT_DEFAULTS
+    case 'experience':
+      return EXPERIENCE_CONTENT_DEFAULTS
+    case 'hobbies':
+      return HOBBIES_CONTENT_DEFAULTS
     case 'contact':
       return CONTACT_CONTENT_DEFAULTS
     case 'header':

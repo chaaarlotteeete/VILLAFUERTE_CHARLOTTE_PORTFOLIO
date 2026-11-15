@@ -68,6 +68,9 @@ Expected:
 |--------|-------------|-------|-----|
 | `portfolio-media` | Yes | Admin only | Profile image, screenshots, cert images |
 | `portfolio-resumes` | Yes | Admin only | Resume PDFs/DOCX |
+| `portfolio-project-docs` | No | Admin only | Private PDFs for AI project documentation import |
+
+Edge Function: `extract-project-document` (admin JWT required). Secrets: `AI_API_KEY` (recommended), optional `AI_API_BASE_URL`, `AI_MODEL`. See `docs/PDF_IMPORT.md`.
 
 ## Next
 

@@ -1,9 +1,16 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ConfirmDeleteButton } from '@/components/admin/ConfirmDeleteButton'
 import { FileUploadField } from '@/components/admin/FileUploadField'
 import { MonthYearPicker } from '@/components/admin/MonthYearPicker'
+import { ReorderControls } from '@/components/admin/ReorderControls'
+import {
+  SortableItemShell,
+  SortableList,
+  type SortableHandleProps,
+} from '@/components/admin/SortableList'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
@@ -24,6 +31,7 @@ import { useAsyncData } from '@/hooks/useAsyncData'
 import {
   deleteCertification,
   fetchAdminCertifications,
+  reorderCertifications,
   saveCertification,
 } from '@/services/adminContent'
 import { fetchAdminTraining } from '@/services/adminTraining'
@@ -62,14 +70,42 @@ const empty = {
 export function AdminCertificationsPage() {
   const { data, error, loading, reload } = useAsyncData(fetchAdminCertifications)
   const { data: trainingRecords } = useAsyncData(fetchAdminTraining)
+  const [orderedItems, setOrderedItems] = useState<Certification[]>([])
+  const [savingOrder, setSavingOrder] = useState(false)
   const [form, setForm] = useState(empty)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
 
+  useEffect(() => {
+    if (data) {
+      setOrderedItems(
+        [...data].sort((a, b) => a.display_order - b.display_order),
+      )
+    }
+  }, [data])
+
+  const persistOrder = useCallback(
+    async (next: Certification[], previous: Certification[]) => {
+      setSavingOrder(true)
+      setOrderedItems(next)
+      try {
+        await reorderCertifications(next.map((item) => item.id))
+        toast.success('Order updated')
+        reload()
+      } catch (err) {
+        setOrderedItems(previous)
+        toast.error(err instanceof Error ? err.message : 'Failed to save order')
+      } finally {
+        setSavingOrder(false)
+      }
+    },
+    [reload],
+  )
+
   if (loading) return <LoadingState rows={3} />
   if (error) return <ErrorState message={error} onRetry={reload} />
 
-  const items = data ?? []
+  const items = orderedItems
   const training = trainingRecords ?? []
 
   function reset() {
@@ -103,7 +139,7 @@ export function AdminCertificationsPage() {
     <div className="space-y-8">
       <PageHeader
         title="Certifications"
-        description="Manage certification gallery, credentials, and visibility."
+        description="Manage certification gallery, credentials, and visibility. Drag to reorder."
         actions={
           <Button
             type="button"
@@ -327,68 +363,120 @@ export function AdminCertificationsPage() {
           }
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {items.map((item) => (
-            <article
-              key={item.id}
-              className="overflow-hidden rounded-xl border bg-card shadow-sm"
-            >
-              {item.image_url ? (
-                <img
-                  src={item.image_url}
-                  alt={item.title}
-                  className="aspect-[4/3] w-full object-cover"
-                />
-              ) : (
-                <div className="flex aspect-[4/3] items-center justify-center bg-muted text-sm text-muted-foreground">
-                  No image
-                </div>
-              )}
-              <div className="space-y-3 p-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold">{item.title}</h3>
-                    <Badge
-                      variant={item.is_visible !== false ? 'success' : 'secondary'}
-                    >
-                      {item.is_visible !== false ? 'Visible' : 'Hidden'}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{item.issuer}</p>
-                  {item.certification_type ? (
-                    <p className="text-xs text-muted-foreground">
-                      {item.certification_type}
-                    </p>
-                  ) : null}
-                  <p className="text-xs text-muted-foreground">
-                    {formatDate(item.issued_at, 'MMM yyyy') || 'No date'}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {item.credential_url ? (
-                    <Button asChild size="sm" variant="ghost">
-                      <a href={item.credential_url} target="_blank" rel="noreferrer">
-                        Credential
-                      </a>
-                    </Button>
-                  ) : null}
-                  <Button size="sm" variant="outline" onClick={() => startEdit(item)}>
-                    Edit
-                  </Button>
-                  <ConfirmDeleteButton
-                    title="Delete certification?"
-                    description="This permanently removes the certification record."
-                    onConfirm={async () => {
-                      await deleteCertification(item.id)
-                      toast.success('Deleted')
-                      reload()
+        <SortableList
+          items={items}
+          disabled={savingOrder}
+          onReorder={async (reordered) => {
+            const withOrder = reordered.map((item, index) => ({
+              ...item,
+              display_order: index,
+            }))
+            await persistOrder(withOrder, items)
+          }}
+          renderItem={(item, handle: SortableHandleProps) => {
+            const index = items.findIndex((row) => row.id === item.id)
+            return (
+              <SortableItemShell className="p-4">
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="mt-1 touch-none rounded p-1 text-muted-foreground hover:bg-muted"
+                    aria-label="Drag to reorder"
+                    {...(handle.listeners as object)}
+                    {...(handle.attributes as object)}
+                  >
+                    <GripVertical className="h-5 w-5" />
+                  </button>
+                  <ReorderControls
+                    disableUp={index <= 0}
+                    disableDown={index >= items.length - 1}
+                    onMoveUp={() => {
+                      if (index <= 0) return
+                      const next = [...items]
+                      const [removed] = next.splice(index, 1)
+                      next.splice(index - 1, 0, removed)
+                      void persistOrder(
+                        next.map((row, i) => ({ ...row, display_order: i })),
+                        items,
+                      )
+                    }}
+                    onMoveDown={() => {
+                      if (index >= items.length - 1) return
+                      const next = [...items]
+                      const [removed] = next.splice(index, 1)
+                      next.splice(index + 1, 0, removed)
+                      void persistOrder(
+                        next.map((row, i) => ({ ...row, display_order: i })),
+                        items,
+                      )
                     }}
                   />
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.title}
+                      className="size-16 shrink-0 rounded-md border object-cover"
+                    />
+                  ) : null}
+                  <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold">{item.title}</h3>
+                        <Badge
+                          variant={
+                            item.is_visible !== false ? 'success' : 'secondary'
+                          }
+                        >
+                          {item.is_visible !== false ? 'Visible' : 'Hidden'}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {item.issuer}
+                      </p>
+                      {item.certification_type ? (
+                        <p className="text-xs text-muted-foreground">
+                          {item.certification_type}
+                        </p>
+                      ) : null}
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(item.issued_at, 'MMM yyyy') || 'No date'}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {item.credential_url ? (
+                        <Button asChild size="sm" variant="ghost">
+                          <a
+                            href={item.credential_url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Credential
+                          </a>
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => startEdit(item)}
+                      >
+                        Edit
+                      </Button>
+                      <ConfirmDeleteButton
+                        title="Delete certification?"
+                        description="This permanently removes the certification record."
+                        onConfirm={async () => {
+                          await deleteCertification(item.id)
+                          toast.success('Deleted')
+                          reload()
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </article>
-          ))}
-        </div>
+              </SortableItemShell>
+            )
+          }}
+        />
       )}
     </div>
   )

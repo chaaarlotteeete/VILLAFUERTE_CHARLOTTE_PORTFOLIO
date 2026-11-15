@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 export function PublicLayout() {
   const location = useLocation()
   const isHome = location.pathname === '/' || location.pathname === ''
+  const isProjectDetail = /^\/projects\/[^/]+\/?$/.test(location.pathname)
+  const isFullBleed = isHome || isProjectDetail
 
   return (
     <div className="relative flex min-h-svh flex-col bg-surface">
@@ -17,14 +19,16 @@ export function PublicLayout() {
         Skip to main content
       </a>
 
-      {!isHome ? <PublicHeader compact /> : null}
+      {!isHome ? <PublicHeader compact={!isProjectDetail} /> : null}
 
       <main
         id="main-content"
         tabIndex={-1}
         className={cn(
           'w-full flex-1 bg-surface',
-          isHome ? 'pt-16' : 'mx-auto max-w-7xl px-6 pt-24 pb-12 lg:px-12',
+          isFullBleed
+            ? 'pt-16'
+            : 'mx-auto max-w-7xl px-6 pt-24 pb-12 lg:px-12',
         )}
       >
         <Outlet />

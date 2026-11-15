@@ -119,6 +119,8 @@ export function FeaturedProjectsSection({
                             project.start_date,
                             project.end_date,
                             project.status === 'Ongoing',
+                            project.start_date_precision,
+                            project.end_date_precision,
                           ) || '—'}
                         </span>
                       </div>

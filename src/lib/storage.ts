@@ -1,6 +1,8 @@
 export const STORAGE_BUCKETS = {
   media: 'portfolio-media',
   resumes: 'portfolio-resumes',
+  /** Admin-only private PDFs used for AI project documentation import. */
+  projectDocs: 'portfolio-project-docs',
 } as const
 
 export type StorageBucket = (typeof STORAGE_BUCKETS)[keyof typeof STORAGE_BUCKETS]

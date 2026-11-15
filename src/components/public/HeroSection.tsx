@@ -79,6 +79,21 @@ export function HeroSection({
     secondaryHref === 'resume' || secondaryHref === '#resume'
       ? resume?.file_url
       : secondaryHref
+  const configFilename =
+    content.config_filename?.trim() || 'developer.config.json'
+  const configKeyEngineer =
+    content.config_key_engineer?.trim() || 'engineer'
+  const configEngineer = content.config_engineer?.trim() || name
+  const configKeyStatus = content.config_key_status?.trim() || 'status'
+  const configStatus = content.config_status?.trim() || 'Open to Work'
+  const configKeyFocus = content.config_key_focus?.trim() || 'focus'
+  const configFocus = content.config_focus?.trim() || specialization
+  const configKeyReady =
+    content.config_key_ready?.trim() || 'readyForDeployment'
+  const configReady =
+    content.config_ready === undefined || content.config_ready === ''
+      ? true
+      : parseContentBoolean(content.config_ready)
 
   const socials = [
     showGithub ? github : null,
@@ -247,23 +262,40 @@ export function HeroSection({
 
               <div className="flex flex-col gap-1 overflow-x-auto rounded-xl bg-inverse-surface p-4 font-mono text-[11px] text-inverse-on-surface shadow-inner">
                 <div className="text-tertiary-fixed-dim">
-                  // developer.config.json
+                  // {configFilename}
                 </div>
                 <div>
-                  <span className="text-primary-fixed-dim">"engineer"</span>:{' '}
-                  <span className="text-secondary-fixed">"{name}"</span>,
+                  <span className="text-primary-fixed-dim">
+                    "{configKeyEngineer}"
+                  </span>
+                  :{' '}
+                  <span className="text-secondary-fixed">"{configEngineer}"</span>,
                 </div>
                 <div>
-                  <span className="text-primary-fixed-dim">"status"</span>:{' '}
-                  <span className="text-tertiary-fixed-dim">"Open to Work"</span>,
+                  <span className="text-primary-fixed-dim">
+                    "{configKeyStatus}"
+                  </span>
+                  :{' '}
+                  <span className="text-tertiary-fixed-dim">
+                    "{configStatus}"
+                  </span>
+                  ,
                 </div>
                 <div>
-                  <span className="text-primary-fixed-dim">"focus"</span>:{' '}
-                  <span className="text-secondary-fixed">"{specialization}"</span>,
+                  <span className="text-primary-fixed-dim">
+                    "{configKeyFocus}"
+                  </span>
+                  :{' '}
+                  <span className="text-secondary-fixed">"{configFocus}"</span>,
                 </div>
                 <div>
-                  <span className="text-primary-fixed-dim">"readyForDeployment"</span>
-                  : <span className="text-tertiary-fixed-dim">true</span>
+                  <span className="text-primary-fixed-dim">
+                    "{configKeyReady}"
+                  </span>
+                  :{' '}
+                  <span className="text-tertiary-fixed-dim">
+                    {configReady ? 'true' : 'false'}
+                  </span>
                 </div>
               </div>
             </div>
